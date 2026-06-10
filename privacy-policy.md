@@ -1,0 +1,37 @@
+# Privacy Policy
+
+**Last updated: June 10, 2026**
+
+This Privacy Policy explains how Daily Agent Digest ("we", "us", or "the app") collects, uses, and protects your information. By using the app, you agree to the practices described here.
+
+## Information We Collect
+
+We collect the email address you sign in with, settings you configure (such as your default email and research agents), and, if you choose to provide them, optional API keys for third-party services (YouTube, OpenAI, Anthropic, Gemini). If you connect your YouTube account, we access playlist, watch history, and video data you authorize through Google's sign-in.
+
+## How We Use Your Information
+
+We use your information solely to provide the app's features: monitoring channels, building your Research Feed, syncing YouTube actions you request, and running AI analysis you initiate. We do not sell your personal information.
+
+## Third-Party Services
+
+The app may interact with Google/YouTube, OpenAI, Anthropic, and Google Gemini using credentials you provide or authorize. Your use of those services is also governed by their respective privacy policies.
+
+## Data Storage and Security
+
+Your data is stored securely in our backend. API keys are stored write-only and are never displayed back to you or read by the app after being saved.
+
+## Data Retention and Deletion
+
+We retain your data for as long as your account is active. You can permanently delete your account and all associated data at any time directly within the app by going to Settings and selecting "Delete Account." This removes your data — including your agents, feeds, watch history, and saved settings — and the deletion takes effect immediately and cannot be undone. If you prefer, or if you need assistance, you can also request deletion by emailing [support@travelone.ca](mailto:support@travelone.ca), and we will complete the deletion within 30 days.
+
+## Children's Privacy
+
+The app is not directed to children under 13, and we do not knowingly collect personal information from them.
+
+## Changes to This Policy
+
+We may update this Privacy Policy from time to time. Material changes will be reflected by updating the "Last updated" date above.
+
+## Contact Us
+
+If you have questions about this Privacy Policy or your data, contact us at [support@travelone.ca](mailto:support@travelone.ca).
