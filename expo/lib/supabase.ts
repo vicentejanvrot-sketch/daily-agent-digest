@@ -5,6 +5,13 @@ import * as SecureStore from "expo-secure-store";
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
+if (!supabaseUrl) {
+  console.error("[supabase] Missing EXPO_PUBLIC_SUPABASE_URL — auth will fail");
+}
+if (!supabaseAnonKey) {
+  console.error("[supabase] Missing EXPO_PUBLIC_SUPABASE_ANON_KEY — auth will fail");
+}
+
 const secureStoreAdapter = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
   setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),

@@ -45,6 +45,9 @@ export const [AuthProvider, useAuth] = createContextHook((): AuthState => {
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      console.warn("[auth-provider] signUp error:", error.message);
+    }
     return { error, success: !error };
   };
 

@@ -62,6 +62,7 @@ export default function SignUpScreen() {
     setIsLoading(false);
 
     if (error) {
+      console.warn("[signup] signUp failed:", error);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       showToast(error.message, "error");
       return;
