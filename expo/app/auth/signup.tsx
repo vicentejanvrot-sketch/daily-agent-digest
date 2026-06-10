@@ -18,19 +18,19 @@ import * as Haptics from "expo-haptics";
 import { useAuth } from "@/lib/auth-provider";
 import { Colors } from "@/constants/colors";
 
-export default function LoginScreen() {
+export default function SignUpScreen() {
   const insets = useSafeAreaInsets();
-  const { signIn } = useAuth();
+  const { signUp } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Focus states for sky-blue border
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [confirmFocused, setConfirmFocused] = useState(false);
 
-  // Toast
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
 
   const showToast = (message: string, type: "error" | "success") => {
@@ -38,15 +38,27 @@ export default function LoginScreen() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleSignIn = async () => {
-    if (!email.trim() || !password.trim()) {
+  const handleSignUp = async () => {
+    if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showToast("Please fill in both email and password.", "error");
+      showToast("Please fill in all fields.", "error");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast("Passwords do not match.", "error");
+      return;
+    }
+
+    if (password.length < 6) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast("Password must be at least 6 characters.", "error");
       return;
     }
 
     setIsLoading(true);
-    const { error } = await signIn(email.trim(), password);
+    const { error } = await signUp(email.trim(), password);
     setIsLoading(false);
 
     if (error) {
@@ -56,11 +68,10 @@ export default function LoginScreen() {
     }
 
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    showToast("Welcome back!", "success");
-    // Brief delay so the user sees the toast before navigating
+    showToast("Account created! Check your email to confirm.", "success");
     setTimeout(() => {
-      router.replace("/(tabs)");
-    }, 600);
+      router.replace("/auth/login");
+    }, 1200);
   };
 
   return (
@@ -74,20 +85,16 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Card */}
         <View style={styles.card}>
-          {/* App icon */}
           <Image
             source={require("@/assets/images/icon.png")}
             style={styles.icon}
             resizeMode="contain"
           />
 
-          {/* Title */}
-          <Text style={styles.title}>Daily Agent Digest</Text>
+          <Text style={styles.title}>Create Account</Text>
 
-          {/* Subtitle */}
-          <Text style={styles.subtitle}>Sign in to your account to continue.</Text>
+          <Text style={styles.subtitle}>Sign up to start using Daily Agent Digest.</Text>
 
           {/* Email field */}
           <Text style={styles.label}>Email</Text>
@@ -112,30 +119,49 @@ export default function LoginScreen() {
           <Text style={styles.label}>Password</Text>
           <TextInput
             style={[styles.input, passwordFocused && styles.inputFocused]}
-            placeholder="Your password"
+            placeholder="At least 6 characters"
             placeholderTextColor={Colors.textMuted}
             value={password}
             onChangeText={setPassword}
             onFocus={() => setPasswordFocused(true)}
             onBlur={() => setPasswordFocused(false)}
             autoCapitalize="none"
-            autoComplete="password"
+            autoComplete="new-password"
             autoCorrect={false}
             secureTextEntry
-            textContentType="password"
+            textContentType="newPassword"
             editable={!isLoading}
-            returnKeyType="done"
-            onSubmitEditing={handleSignIn}
+            returnKeyType="next"
           />
 
-          {/* Sign in button */}
+          {/* Confirm Password field */}
+          <Text style={styles.label}>Confirm Password</Text>
+          <TextInput
+            style={[styles.input, confirmFocused && styles.inputFocused]}
+            placeholder="Re-enter your password"
+            placeholderTextColor={Colors.textMuted}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            onFocus={() => setConfirmFocused(true)}
+            onBlur={() => setConfirmFocused(false)}
+            autoCapitalize="none"
+            autoComplete="new-password"
+            autoCorrect={false}
+            secureTextEntry
+            textContentType="newPassword"
+            editable={!isLoading}
+            returnKeyType="done"
+            onSubmitEditing={handleSignUp}
+          />
+
+          {/* Sign up button */}
           <Pressable
             style={({ pressed }) => [
               styles.button,
               pressed && styles.buttonPressed,
               isLoading && styles.buttonDisabled,
             ]}
-            onPress={handleSignIn}
+            onPress={handleSignUp}
             disabled={isLoading}
           >
             <LinearGradient
@@ -147,24 +173,16 @@ export default function LoginScreen() {
             {isLoading ? (
               <ActivityIndicator color={Colors.white} size="small" />
             ) : (
-              <Text style={styles.buttonText}>Sign in</Text>
+              <Text style={styles.buttonText}>Create Account</Text>
             )}
           </Pressable>
 
-          {/* Forgot password link */}
+          {/* Sign in link */}
           <Pressable
             style={({ pressed }) => [styles.linkWrap, pressed && { opacity: 0.6 }]}
-            onPress={() => router.push("/auth/forgot-password")}
+            onPress={() => router.back()}
           >
-            <Text style={styles.link}>Forgot password?</Text>
-          </Pressable>
-
-          {/* Sign up link */}
-          <Pressable
-            style={({ pressed }) => [styles.linkWrap, styles.linkWrapSecondary, pressed && { opacity: 0.6 }]}
-            onPress={() => router.push("/auth/signup")}
-          >
-            <Text style={styles.linkSecondary}>Don't have an account? Sign up</Text>
+            <Text style={styles.link}>Already have an account? Sign in</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -277,16 +295,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingVertical: 8,
   },
-  linkWrapSecondary: {
-    marginTop: 4,
-  },
   link: {
     color: Colors.accent,
-    fontSize: 14,
-    fontWeight: "500" as const,
-  },
-  linkSecondary: {
-    color: Colors.textSecondary,
     fontSize: 14,
     fontWeight: "500" as const,
   },

@@ -11,6 +11,7 @@ interface AuthState {
   status: AuthStatus;
   session: Session | null;
   user: User | null;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; success: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ error: AuthError | null }>;
@@ -41,6 +42,11 @@ export const [AuthProvider, useAuth] = createContextHook((): AuthState => {
 
     return () => sub?.subscription.unsubscribe();
   }, []);
+
+  const signUp = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    return { error, success: !error };
+  };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -83,5 +89,5 @@ export const [AuthProvider, useAuth] = createContextHook((): AuthState => {
     return { error };
   };
 
-  return { status, session, user, signIn, signOut, sendPasswordReset, updatePassword };
+  return { status, session, user, signUp, signIn, signOut, sendPasswordReset, updatePassword };
 });
