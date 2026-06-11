@@ -684,6 +684,7 @@ export default function VideoPlayerScreen() {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.fullscreenSpeedRow}
+                style={{ flexShrink: 1 }}
               >
                 {SPEED_KEYS.map((s) => {
                   const isActive = s === speed;
@@ -1086,6 +1087,10 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 16,
     zIndex: 105,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 12,
   },
   fullscreenSpeedRow: {
     flexDirection: "row",
@@ -1098,7 +1103,7 @@ const styles = StyleSheet.create({
   },
   fullscreenCountdown: {
     alignItems: "flex-end",
-    marginTop: 8,
+    flexShrink: 0,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
