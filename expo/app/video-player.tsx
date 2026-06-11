@@ -66,6 +66,9 @@ const STATUS_ENTRIES = Object.entries(STATUS_ICONS) as [
   (typeof STATUS_ICONS)[ItemStatus],
 ][];
 
+/** Maximum player width on large screens so the player doesn't stretch across a big monitor/iPad. */
+const PLAYER_MAX_WIDTH = 720;
+
 /** Compact labels for the inline speed pill row. */
 const SPEED_PILL_LABELS: Record<SpeedKey, string> = {
   "1": "1\u00D7",
@@ -250,6 +253,10 @@ export default function VideoPlayerScreen() {
   }, []);
 
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+  // Embedded (non-fullscreen) player sizing — 16:9 with a sensible max width
+  const embeddedWidth = Math.min(windowWidth, PLAYER_MAX_WIDTH);
+  const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
 
   const handleClose = useCallback(() => {
     router.back();
@@ -585,7 +592,7 @@ export default function VideoPlayerScreen() {
         <VideoPlayerContent
           ref={playerRef}
           videoId={videoIdStr}
-          height={isFullscreen ? Math.max(windowWidth, windowHeight) : 220}
+          height={isFullscreen ? Math.max(windowWidth, windowHeight) : embeddedHeight}
           playbackRate={playbackRate}
           onReady={() => {
             setReady(true);
@@ -906,6 +913,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   playerWrapper: {
+    width: "100%",
+    maxWidth: PLAYER_MAX_WIDTH,
+    alignSelf: "center",
     backgroundColor: Colors.black,
     overflow: "hidden",
   },
@@ -935,6 +945,9 @@ const styles = StyleSheet.create({
 
   // ── Inline speed selector ──────────────────────────────────
   speedSelectorRow: {
+    width: "100%",
+    maxWidth: PLAYER_MAX_WIDTH,
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
@@ -978,6 +991,9 @@ const styles = StyleSheet.create({
 
   // ── Countdown pill ─────────────────────────────────────────
   countdownWrapper: {
+    width: "100%",
+    maxWidth: PLAYER_MAX_WIDTH,
+    alignSelf: "center",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingBottom: 6,
@@ -998,6 +1014,9 @@ const styles = StyleSheet.create({
   },
 
   actionsRow: {
+    width: "100%",
+    maxWidth: PLAYER_MAX_WIDTH,
+    alignSelf: "center",
     flexDirection: "row",
     justifyContent: "space-evenly",
     paddingVertical: 16,
