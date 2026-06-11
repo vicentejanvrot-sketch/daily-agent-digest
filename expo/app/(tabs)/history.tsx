@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -22,6 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertTriangle,
+  Trash2,
 } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
 import type { Run, RunStatus, Agent, Channel } from "@/lib/database";
@@ -31,6 +33,7 @@ import {
   useCancelRun,
   useRealtimeInvalidation,
   useChannelsAll,
+  useClearRuns,
   qk,
 } from "@/lib/hooks";
 import { useToast } from "@/components/Toast";
@@ -105,12 +108,33 @@ export default function HistoryScreen() {
   const router = useRouter();
   const toast = useToast();
 
+  const handleDeleteAll = () => {
+    Alert.alert(
+      "Delete All Run History",
+      "This will permanently delete all run history. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete All",
+          style: "destructive",
+          onPress: () => {
+            clearRuns.mutate(undefined, {
+              onSuccess: () => toast("Run history deleted", "success"),
+              onError: () => toast("Failed to delete run history", "error"),
+            });
+          },
+        },
+      ],
+    );
+  };
+
   const runs = useRuns(100);
   const agents = useAgents();
   const cancelRun = useCancelRun();
   useRealtimeInvalidation("runs", qk.runs);
 
   const allChannels = useChannelsAll();
+  const clearRuns = useClearRuns();
 
   const runData: Run[] = runs.data ?? [];
 
@@ -154,6 +178,23 @@ export default function HistoryScreen() {
               : "Timeline of agent activity"}
           </Text>
         </View>
+
+        {runData.length > 0 && (
+          <Pressable
+            onPress={handleDeleteAll}
+            disabled={clearRuns.isPending}
+            style={({ pressed }) => [
+              styles.deleteAllBtn,
+              pressed && styles.deleteAllBtnPressed,
+              clearRuns.isPending && styles.deleteAllBtnDisabled,
+            ]}
+          >
+            <Trash2 size={16} color={Colors.destructive} />
+            <Text style={styles.deleteAllText}>
+              {clearRuns.isPending ? "Deleting…" : "Delete All"}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {runs.isLoading && runData.length === 0 ? (
@@ -632,5 +673,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     flexShrink: 0,
+  },
+
+  // Delete All button
+  deleteAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.destructive,
+  },
+  deleteAllBtnPressed: { opacity: 0.6 },
+  deleteAllBtnDisabled: { opacity: 0.5 },
+  deleteAllText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.destructive,
   },
 });
