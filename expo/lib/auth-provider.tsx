@@ -44,11 +44,23 @@ export const [AuthProvider, useAuth] = createContextHook((): AuthState => {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) {
       console.warn("[auth-provider] signUp error:", error.message);
+      return { error, success: false };
     }
-    return { error, success: !error };
+
+    // Backend auto-confirms accounts. If signUp didn't return a session,
+    // establish one immediately so the user is authenticated right away.
+    if (!data.session) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        console.warn("[auth-provider] post-signUp signIn error:", signInError.message);
+        return { error: signInError, success: false };
+      }
+    }
+
+    return { error: null, success: true };
   };
 
   const signIn = async (email: string, password: string) => {

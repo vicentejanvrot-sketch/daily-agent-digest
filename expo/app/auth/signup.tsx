@@ -69,10 +69,12 @@ export default function SignUpScreen() {
     }
 
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    showToast("Account created! Check your email to confirm.", "success");
+    showToast("Account created!", "success");
+    // The auth state listener will pick up the new session and the guards
+    // will redirect, but navigate explicitly to the main app to be safe.
     setTimeout(() => {
-      router.replace("/auth/login");
-    }, 1200);
+      router.replace("/(tabs)");
+    }, 600);
   };
 
   return (
