@@ -110,15 +110,16 @@ export default function HistoryScreen() {
 
   const handleDeleteAll = () => {
     Alert.alert(
-      "Delete All Run History",
-      "This will permanently delete all run history. This cannot be undone.",
+      "Delete Run History",
+      "This will permanently delete the run history shown here. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete All",
           style: "destructive",
           onPress: () => {
-            clearRuns.mutate(undefined, {
+            const runIds = runData.map((r) => r.id);
+            clearRuns.mutate(runIds, {
               onSuccess: () => toast("Run history deleted", "success"),
               onError: () => toast("Failed to delete run history", "error"),
             });

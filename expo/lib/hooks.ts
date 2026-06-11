@@ -657,32 +657,18 @@ export function useCancelRun() {
   });
 }
 
-/** Delete all runs belonging to the signed-in user (RLS-scoped). */
+/** Delete only the specified run IDs (RLS-scoped). */
 export function useClearRuns() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not signed in");
-
-      // Get the user's agent ids so we can scope the delete explicitly.
-      const { data: agents, error: agentsError } = await supabase
-        .from("agents")
-        .select("id")
-        .eq("user_id", user.id);
-      if (agentsError) throw agentsError;
-
-      const agentIds = (agents ?? []).map((a: { id: string }) => a.id);
-      if (agentIds.length === 0) return;
-
-      // RLS already scopes deletes to the user, but we filter by agent_id
-      // explicitly so the delete has a concrete WHERE clause.
+    mutationFn: async (runIds: string[]) => {
+      if (!runIds || runIds.length === 0) return;
+      // Delete ONLY the runs passed in (the ones shown on the History screen).
+      // RLS still scopes deletes to the signed-in user's rows.
       const { error } = await supabase
         .from("runs")
         .delete()
-        .in("agent_id", agentIds);
+        .in("id", runIds);
       if (error) throw error;
     },
     onSettled: () => {
