@@ -96,6 +96,11 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           allowsInlineMediaPlayback: true,
           mediaPlaybackRequiresUserAction: true,
           injectedJavaScript: INJECTED_SPEED_HANDLER,
+          userAgent:
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+          allowsFullscreenVideo: true,
+          domStorageEnabled: true,
+          thirdPartyCookiesEnabled: true,
         }}
         initialPlayerParams={{
           controls: 1,
@@ -103,6 +108,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           rel: 0,
           playsinline: 1,
           preventFullScreen: true,
+          origin: "https://www.youtube.com",
         }}
       />
     );
