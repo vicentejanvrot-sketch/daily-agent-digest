@@ -189,8 +189,38 @@ export function useUpdateItemStatus() {
       if (error) throw error;
       return { id, status };
     },
+    onMutate: async ({ id, status }) => {
+      // Cancel outgoing feed queries so they don't overwrite our optimistic update.
+      await queryClient.cancelQueries({ queryKey: ["feedItems"] });
+
+      // Snapshot current feed data for rollback on error.
+      const previousFeed = queryClient.getQueriesData<ItemWithAnalysis[]>({
+        queryKey: ["feedItems"],
+      });
+
+      // Optimistically update each feed query cache in-place.
+      for (const [queryKey, data] of previousFeed) {
+        if (!data) continue;
+        queryClient.setQueryData<ItemWithAnalysis[]>(queryKey, (old) =>
+          old?.map((item) =>
+            item.id === id ? { ...item, user_status: status } : item,
+          ) ?? old,
+        );
+      }
+
+      return { previousFeed };
+    },
+    onError: (_err, _vars, context) => {
+      // Roll back every feed query to its pre-mutation snapshot.
+      if (context?.previousFeed) {
+        for (const [queryKey, data] of context.previousFeed) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["items"] });
+      void queryClient.invalidateQueries({ queryKey: ["feedItems"] });
     },
   });
 }
