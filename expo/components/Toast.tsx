@@ -2,6 +2,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
+import { CheckCircle2, X } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
 
 type ToastType = "error" | "success" | "info";
@@ -53,28 +54,31 @@ export function ToastHost() {
 
   if (!toast) return null;
 
-  const accent =
+  const statusColor =
     toast.type === "error"
-      ? Colors.destructive
+      ? "hsl(0, 72%, 55%)"
       : toast.type === "success"
-        ? Colors.success
-        : Colors.accent;
-  const bg =
-    toast.type === "error"
-      ? Colors.destructiveBg
-      : toast.type === "success"
-        ? "hsl(142, 30%, 12%)"
-        : "hsl(199, 40%, 13%)";
+        ? "hsl(142, 66%, 50%)"
+        : "hsl(199, 89%, 48%)";
 
   return (
     <View pointerEvents="none" style={styles.overlay}>
       <Animated.View
         style={[
           styles.toast,
-          { backgroundColor: bg, borderLeftColor: accent, opacity },
+          { backgroundColor: statusColor, opacity },
         ]}
       >
-        <Text style={[styles.text, { color: accent }]}>{toast.message}</Text>
+        {toast.type === "success" ? (
+          <View style={styles.iconCircle}>
+            <CheckCircle2 size={20} color={"hsl(142, 66%, 50%)"} strokeWidth={2.5} />
+          </View>
+        ) : toast.type === "error" ? (
+          <View style={styles.iconCircle}>
+            <X size={20} color={"hsl(0, 72%, 55%)"} strokeWidth={2.5} />
+          </View>
+        ) : null}
+        <Text style={styles.text}>{toast.message}</Text>
       </Animated.View>
     </View>
   );
@@ -92,20 +96,34 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   toast: {
+    flexDirection: "row",
+    alignItems: "center",
     maxWidth: "85%",
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderLeftWidth: 3,
-    shadowColor: Colors.black,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
     elevation: 8,
   },
+  iconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
   text: {
+    flex: 1,
     fontSize: 14,
-    fontWeight: "500" as const,
-    textAlign: "center",
+    fontWeight: "700" as const,
+    color: Colors.white,
+    textAlign: "left",
   },
 });
