@@ -629,7 +629,8 @@ export default function VideoPlayerScreen() {
           </View>
         )}
         {isFullscreen ? (
-          <View
+          <>
+            <View
             style={[
               styles.fullscreenPlayerInner,
               {
@@ -641,6 +642,7 @@ export default function VideoPlayerScreen() {
             <VideoPlayerContent
               ref={playerRef}
               videoId={videoIdStr}
+              width={fullscreenPlayerWidth}
               height={fullscreenPlayerHeight}
               playbackRate={playbackRate}
               onReady={() => {
@@ -669,6 +671,56 @@ export default function VideoPlayerScreen() {
               onChangeState={handleStateChange}
             />
           </View>
+
+          {/* Fullscreen controls overlay */}
+          {ready && (
+            <View style={styles.fullscreenControls} pointerEvents="box-none">
+              {/* Speed pills */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.fullscreenSpeedRow}
+              >
+                {SPEED_KEYS.map((s) => {
+                  const isActive = s === speed;
+                  return (
+                    <Pressable
+                      key={s}
+                      style={({ pressed }) => [
+                        styles.speedPill,
+                        styles.fullscreenSpeedPill,
+                        isActive && styles.speedPillActive,
+                        pressed && styles.speedPillPressed,
+                      ]}
+                      onPress={() => handleSpeedSelect(s)}
+                    >
+                      <Text
+                        style={[
+                          styles.speedPillText,
+                          isActive && styles.speedPillTextActive,
+                        ]}
+                      >
+                        {SPEED_PILL_LABELS[s]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Countdown pill */}
+              {duration > 0 && (
+                <View style={styles.fullscreenCountdown}>
+                  <View style={styles.countdownPill}>
+                    <Clock size={14} color={Colors.textMuted} />
+                    <Text style={styles.countdownText}>
+                      {formatTime(Math.max(0, duration - currentTime))} left
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+          </>
         ) : (
           <VideoPlayerContent
             ref={playerRef}
@@ -708,6 +760,7 @@ export default function VideoPlayerScreen() {
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               exitFullscreen();
+              handleClose();
             }}
             style={[
               styles.fullscreenCloseBtn,
@@ -1018,6 +1071,31 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 110,
+  },
+
+  // ── Fullscreen overlay controls ────────────────────────────
+  fullscreenControls: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: 24,
+    paddingHorizontal: 16,
+    zIndex: 105,
+  },
+  fullscreenSpeedRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  fullscreenSpeedPill: {
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  fullscreenCountdown: {
+    alignItems: "flex-end",
+    marginTop: 8,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -17,6 +17,7 @@ export interface VideoPlayerHandle {
 
 interface VideoPlayerContentProps {
   videoId: string;
+  width?: number;
   height?: number;
   playbackRate?: number;
   onReady?: () => void;
@@ -49,7 +50,7 @@ const Iframe = "iframe" as any;
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
-    { videoId, height = 220, playbackRate: _playbackRate, onReady, onError, onChangeState },
+    { videoId, width: _width, height = 220, playbackRate: _playbackRate, onReady, onError, onChangeState },
     ref,
   ) {
     const iframeElRef = useRef<HTMLIFrameElement | null>(null);

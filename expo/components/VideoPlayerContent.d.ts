@@ -10,6 +10,7 @@ export interface VideoPlayerHandle {
 
 interface VideoPlayerContentProps {
   videoId: string;
+  width?: number;
   height?: number;
   playbackRate?: number;
   onReady?: () => void;

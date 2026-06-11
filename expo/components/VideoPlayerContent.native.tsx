@@ -41,6 +41,7 @@ const INJECTED_SPEED_HANDLER = `
 
 interface VideoPlayerContentProps {
   videoId: string;
+  width?: number;
   height?: number;
   playbackRate?: number;
   onReady?: () => void;
@@ -58,7 +59,7 @@ interface VideoPlayerContentProps {
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
-    { videoId, height = 220, playbackRate = 1, onReady, onError, onChangeState },
+    { videoId, width, height = 220, playbackRate = 1, onReady, onError, onChangeState },
     ref,
   ) {
     const youtubeRef = useRef<YoutubeIframeRef | null>(null);
@@ -83,6 +84,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     return (
       <YoutubeIframe
         ref={youtubeRef}
+        width={width}
         height={height}
         videoId={videoId}
         play={false}
