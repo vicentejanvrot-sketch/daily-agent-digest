@@ -176,7 +176,25 @@ export default function VideoPlayerScreen() {
     if (Platform.OS !== "web") {
       await ScreenOrientation.unlockAsync();
     } else {
-      await playerRef.current?.exitFullscreen();
+      // Try the player's own exit first, then fall back to the browser API
+      try {
+        await playerRef.current?.exitFullscreen();
+      } catch {
+        // ignore
+      }
+      // Safety net: if still in fullscreen, exit directly via the browser
+      if (typeof document !== "undefined" && document.fullscreenElement) {
+        try {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (document as any).webkitExitFullscreen?.();
+          }
+        } catch {
+          // ignore
+        }
+      }
     }
   }, []);
 

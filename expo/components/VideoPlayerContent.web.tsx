@@ -72,22 +72,29 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       requestFullscreen: async () => {
         if (iframeElRef.current) {
           try {
-            await iframeElRef.current.requestFullscreen();
+            if (iframeElRef.current.requestFullscreen) {
+              await iframeElRef.current.requestFullscreen();
+            } else {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (iframeElRef.current as any).webkitRequestFullscreen?.();
+            }
           } catch {
             // Fullscreen request may be denied (e.g. no user gesture)
           }
         }
       },
       exitFullscreen: async () => {
-        if (
-          typeof document !== "undefined" &&
-          document.fullscreenElement
-        ) {
-          try {
+        if (typeof document === "undefined") return;
+        if (!document.fullscreenElement) return;
+        try {
+          if (document.exitFullscreen) {
             await document.exitFullscreen();
-          } catch {
-            // ignore
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (document as any).webkitExitFullscreen?.();
           }
+        } catch {
+          // ignore
         }
       },
     }));
