@@ -104,6 +104,18 @@ function useRunningOverlayState() {
                 status: "success",
                 message: count > 0 ? `Found ${count} new videos` : "No new videos found",
               }));
+            } else if (newStatus === "partial") {
+              // Partial completion — some channels scanned, some failed
+              cleanupChannel();
+              const count = (row.videos_new_count as number) ?? 0;
+              setState((prev) => ({
+                ...prev,
+                status: "success",
+                message:
+                  count > 0
+                    ? `Found ${count} new videos (some channels couldn't be scanned)`
+                    : "Scan finished — some channels couldn't be scanned.",
+              }));
             } else if (newStatus === "failed" || newStatus === "cancelled") {
               cleanupChannel();
               setState((prev) => ({
@@ -112,7 +124,7 @@ function useRunningOverlayState() {
                 message:
                   (row.error_summary as string) || "Check run details for more information",
               }));
-            } else {
+            } else if (newStatus === "running" || newStatus == null) {
               // Still running — update progress
               setState((prev) => ({
                 ...prev,
@@ -126,6 +138,15 @@ function useRunningOverlayState() {
                   currentChannelName:
                     (row.current_channel_name as string) ?? null,
                 },
+              }));
+            } else {
+              // Safety net: unrecognised terminal status — resolve as success
+              // so the overlay never gets permanently stuck
+              cleanupChannel();
+              setState((prev) => ({
+                ...prev,
+                status: "success",
+                message: "Scan complete",
               }));
             }
           },
