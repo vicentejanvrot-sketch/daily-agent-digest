@@ -260,7 +260,7 @@ function Meta({ icon, text }: { icon: React.ReactNode; text: string }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 16, paddingBottom: 32 },
-  contentWide: { maxWidth: 720, width: "100%", alignItems: "center" as const },
+  contentWide: { maxWidth: 720, width: "100%" },
   header: {
     flexDirection: "row",
     alignItems: "flex-end",
