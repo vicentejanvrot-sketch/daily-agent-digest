@@ -789,7 +789,7 @@ export default function AgentDetailScreen() {
   return (
     <>
       <ScrollView
-        style={[styles.root, isWide && styles.rootWide]}
+        style={styles.root}
         contentContainerStyle={[styles.content, isWide && styles.contentWide, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!overlay.state.status}
@@ -1369,9 +1369,8 @@ function RunStat({ label, value }: { label: string; value: number | string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
-  rootWide: { alignItems: "center" },
   content: { paddingHorizontal: 16, paddingBottom: 32 },
-  contentWide: { maxWidth: 720, width: "100%" },
+  contentWide: { maxWidth: 720, width: "100%", alignItems: "center" as const },
   loadingBox: {
     flex: 1,
     alignItems: "center",
