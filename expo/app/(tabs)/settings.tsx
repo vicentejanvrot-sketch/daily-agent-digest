@@ -12,6 +12,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -101,8 +102,12 @@ function hasBadChars(v: string): boolean {
 
 // ── Component ─────────────────────────────────────────────────────
 
+const IPAD_BREAKPOINT = 768;
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isWide = windowWidth >= IPAD_BREAKPOINT;
   const { user, signOut } = useAuth();
   const showToast = useToast();
 
@@ -313,7 +318,7 @@ export default function SettingsScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        contentContainerStyle={[styles.content, isWide && styles.contentWide, { paddingTop: insets.top + 16 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -820,6 +825,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
+  contentWide: { maxWidth: 720, alignSelf: "center", width: "100%" },
   heading: {
     fontSize: 26,
     fontWeight: "800" as const,

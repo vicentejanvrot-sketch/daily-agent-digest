@@ -3,7 +3,7 @@
     "name": "Daily Agent Digest",
     "slug": "je0yu8oeyjzcpim4k10q0",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "rork-app",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
       "backgroundColor": "#0fa0e6"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "app.rork.je0yu8oeyjzcpim4k10q0"
     },
     "android": {

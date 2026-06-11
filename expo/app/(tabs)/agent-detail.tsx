@@ -11,6 +11,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -513,8 +514,12 @@ const riStyles = StyleSheet.create({
 
 // ── Main screen ────────────────────────────────────────────────────
 
+const IPAD_BREAKPOINT = 768;
+
 export default function AgentDetailScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isWide = windowWidth >= IPAD_BREAKPOINT;
   const router = useRouter();
   const { agentId } = useLocalSearchParams<{ agentId: string }>();
 
@@ -783,8 +788,8 @@ export default function AgentDetailScreen() {
   return (
     <>
       <ScrollView
-        style={styles.root}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
+        style={[styles.root, isWide && styles.rootWide]}
+        contentContainerStyle={[styles.content, isWide && styles.contentWide, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!overlay.state.status}
         refreshControl={
@@ -1338,7 +1343,9 @@ function RunStat({ label, value }: { label: string; value: number }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
+  rootWide: { alignItems: "center" },
   content: { paddingHorizontal: 16, paddingBottom: 32 },
+  contentWide: { maxWidth: 720, width: "100%" },
   loadingBox: {
     flex: 1,
     alignItems: "center",

@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
@@ -104,8 +105,12 @@ function channelDisplayName(ch: Channel): string {
 
 // ── Main Screen ───────────────────────────────────────────────────
 
+const IPAD_BREAKPOINT = 768;
+
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isWide = windowWidth >= IPAD_BREAKPOINT;
   const showToast = useToast();
   const params = useLocalSearchParams<{ agentId?: string; status?: string }>();
 
@@ -260,7 +265,7 @@ export default function FeedScreen() {
   // ── Render ──────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, isWide && styles.rootWide, { paddingTop: insets.top }]}>
       <View style={styles.headerRow}>
         <Text style={styles.heading}>Research Feed</Text>
         {!items.isLoading ? (
@@ -745,11 +750,14 @@ function Stat({ icon, value }: { icon: React.ReactNode; value: string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
+  rootWide: { alignItems: "center" },
   headerRow: {
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
     paddingHorizontal: 16,
+    maxWidth: 720,
+    width: "100%",
     paddingTop: 12,
     marginBottom: 10,
   },
@@ -769,6 +777,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginHorizontal: 16,
+    maxWidth: 720,
+    width: "100%",
     marginBottom: 10,
     backgroundColor: Colors.input,
     borderRadius: 12,
@@ -797,6 +807,8 @@ const styles = StyleSheet.create({
   // Filter wrapper
   filtersWrapper: {
     paddingHorizontal: 16,
+    maxWidth: 720,
+    width: "100%",
     marginBottom: 12,
     gap: 8,
   },
@@ -940,7 +952,7 @@ const styles = StyleSheet.create({
 
   // List
   loadingBox: { paddingVertical: 60, alignItems: "center" },
-  listContent: { padding: 16, gap: 14, paddingBottom: 32 },
+  listContent: { padding: 16, gap: 14, paddingBottom: 32, maxWidth: 720, width: "100%" },
   emptyCard: {
     backgroundColor: Colors.card,
     borderRadius: 12,

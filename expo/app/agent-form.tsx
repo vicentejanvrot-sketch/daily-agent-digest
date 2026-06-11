@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -45,8 +46,12 @@ function validateEmail(email: string): boolean {
 
 // ─── main screen ────────────────────────────────────────────────────
 
+const IPAD_BREAKPOINT = 768;
+
 export default function AgentFormScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isWide = windowWidth >= IPAD_BREAKPOINT;
   const router = useRouter();
   const showToast = useToast();
   const { agentId } = useLocalSearchParams<{ agentId?: string }>();
@@ -329,6 +334,7 @@ export default function AgentFormScreen() {
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
+          isWide && styles.contentWide,
           { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40 },
         ]}
         keyboardShouldPersistTaps="handled"
@@ -1013,6 +1019,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 16 },
+  contentWide: { maxWidth: 720, alignSelf: "center", width: "100%" },
   centered: { alignItems: "center", justifyContent: "center" },
   header: {
     flexDirection: "row",

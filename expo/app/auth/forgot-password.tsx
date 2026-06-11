@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,8 +20,12 @@ import { ArrowLeft } from "lucide-react-native";
 import { useAuth } from "@/lib/auth-provider";
 import { Colors } from "@/constants/colors";
 
+const IPAD_BREAKPOINT = 768;
+
 export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isWide = windowWidth >= IPAD_BREAKPOINT;
   const { sendPasswordReset } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -74,7 +79,7 @@ export default function ForgotPasswordScreen() {
         </Pressable>
 
         {/* Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, isWide && styles.cardWide]}>
           {/* App icon */}
           <Image
             source={require("@/assets/images/icon.png")}
@@ -186,6 +191,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 28,
     alignItems: "center",
+  },
+  cardWide: {
+    maxWidth: 440,
+    alignSelf: "center",
+    width: "100%",
   },
   icon: {
     width: 64,

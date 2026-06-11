@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -21,8 +22,12 @@ import { supabase } from "@/lib/supabase";
 import { useRunningOverlay } from "@/lib/running-overlay";
 import { useToast } from "@/components/Toast";
 
+const IPAD_BREAKPOINT = 768;
+
 export default function AgentsScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isWide = windowWidth >= IPAD_BREAKPOINT;
   const router = useRouter();
   const showToast = useToast();
   const agents = useAgents();
@@ -137,8 +142,8 @@ export default function AgentsScreen() {
 
   return (
     <ScrollView
-      style={styles.root}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+      style={[styles.root, isWide && styles.rootWide]}
+      contentContainerStyle={[styles.content, isWide && styles.contentWide, { paddingTop: insets.top + 16 }]}
       showsVerticalScrollIndicator={false}
       scrollEnabled={!overlay.state.status}
       refreshControl={
@@ -254,7 +259,9 @@ function Meta({ icon, text }: { icon: React.ReactNode; text: string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
+  rootWide: { alignItems: "center" },
   content: { paddingHorizontal: 16, paddingBottom: 32 },
+  contentWide: { maxWidth: 720, width: "100%" },
   header: {
     flexDirection: "row",
     alignItems: "flex-end",

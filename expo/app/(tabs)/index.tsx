@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -51,8 +52,12 @@ import WatchTimeStats from "@/components/WatchTimeStats";
 import { useRunningOverlay } from "@/lib/running-overlay";
 import type { ItemStatus, Run, Channel } from "@/lib/database";
 
+const IPAD_BREAKPOINT = 768;
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isWide = windowWidth >= IPAD_BREAKPOINT;
   const router = useRouter();
   const showToast = useToast();
 
@@ -257,6 +262,7 @@ export default function DashboardScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
+          isWide && styles.contentWide,
           { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 70 },
         ]}
         keyboardShouldPersistTaps="handled"
@@ -308,27 +314,31 @@ export default function DashboardScreen() {
       ) : (
         <>
           {/* ── Stat cards ───────────────────────────────────────── */}
-          <View style={styles.grid}>
+          <View style={[styles.grid, isWide && styles.gridWide]}>
             <StatCard
               icon={<Bot size={20} color={statIconBlue} strokeWidth={1.75} />}
               label="Active Agents"
               value={list.length}
+              isWide={isWide}
             />
             <StatCard
               icon={<Video size={20} color={statIconBlue} strokeWidth={1.75} />}
               label="Channels Tracked"
               value={channelList.length}
+              isWide={isWide}
             />
             <StatCard
               icon={<Activity size={20} color={statIconBlue} strokeWidth={1.75} />}
               label="Recent Runs"
               value={runList.length}
+              isWide={isWide}
             />
             <StatCard
               icon={<TrendingUp size={20} color={statIconBlue} strokeWidth={1.75} />}
               label="Success Rate"
               value={successRate}
               suffix="%"
+              isWide={isWide}
             />
           </View>
 
@@ -423,14 +433,16 @@ function StatCard({
   label,
   value,
   suffix,
+  isWide,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
   suffix?: string;
+  isWide?: boolean;
 }) {
   return (
-    <View style={statStyles.card}>
+    <View style={[statStyles.card, isWide && statStyles.cardWide]}>
       <View style={statStyles.topRow}>
         <Text style={statStyles.label}>{label}</Text>
         <View style={statStyles.iconBox}>{icon}</View>
@@ -453,6 +465,9 @@ const statStyles = StyleSheet.create({
     borderColor: "hsl(220, 25%, 18%)",
     minHeight: 94,
     justifyContent: "space-between",
+  },
+  cardWide: {
+    width: "22%",
   },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   label: { fontSize: 12, fontWeight: "600" as const, color: Colors.textSecondary, flexShrink: 1, numberOfLines: 2, marginRight: 6 },
@@ -833,6 +848,11 @@ const emptyStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 16 },
+  contentWide: {
+    maxWidth: 720,
+    alignSelf: "center",
+    width: "100%",
+  },
   header: {
     flexDirection: "column",
     alignItems: "flex-start",
@@ -866,6 +886,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+  },
+  gridWide: {
+    gap: 16,
   },
   sectionSpacer: { height: 4 },
 });
