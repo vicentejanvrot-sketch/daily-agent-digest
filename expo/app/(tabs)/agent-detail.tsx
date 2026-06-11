@@ -37,6 +37,7 @@ import {
   Check,
   ChevronDown,
   Filter,
+  Ban,
 } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
@@ -1077,12 +1078,37 @@ export default function AgentDetailScreen() {
                 <RunStat label="Found" value={run.videos_found_count ?? 0} />
                 <RunStat label="New" value={run.videos_new_count ?? 0} />
                 <RunStat label="Enriched" value={run.videos_enriched_count ?? 0} />
+                <RunStat
+                  label="Channels"
+                  value={`${run.channels_scanned ?? 0}/${run.channels_total ?? 0}`}
+                />
               </View>
 
-              {run.error_summary ? (
+              {run.status === "partial" && run.error_summary ? (
+                <View style={styles.warningRow}>
+                  <AlertTriangle size={13} color={Colors.warning} />
+                  <View style={styles.warningBody}>
+                    <Text style={styles.warningLabel}>Completed with issues</Text>
+                    <Text style={styles.warningSummary} numberOfLines={3}>
+                      {run.error_summary}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {run.status === "failed" && run.error_summary ? (
                 <View style={styles.errorRow}>
                   <AlertTriangle size={13} color={Colors.destructive} />
-                  <Text style={styles.errorSummary} numberOfLines={2}>
+                  <Text style={styles.errorSummary} numberOfLines={3}>
+                    {run.error_summary}
+                  </Text>
+                </View>
+              ) : null}
+
+              {run.status === "cancelled" && run.error_summary ? (
+                <View style={styles.cancelledRow}>
+                  <Ban size={13} color={Colors.textMuted} />
+                  <Text style={styles.cancelledSummary} numberOfLines={3}>
                     {run.error_summary}
                   </Text>
                 </View>
@@ -1330,7 +1356,7 @@ function ChannelCard({
   );
 }
 
-function RunStat({ label, value }: { label: string; value: number }) {
+function RunStat({ label, value }: { label: string; value: number | string }) {
   return (
     <View style={styles.runStat}>
       <Text style={styles.runStatValue}>{value}</Text>
@@ -1619,7 +1645,49 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
   },
-  errorSummary: { flex: 1, fontSize: 12, color: Colors.destructive },
+  errorSummary: { flex: 1, fontSize: 12, color: Colors.destructive, lineHeight: 17 },
+
+  /* Warning row (partial) */
+  warningRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 12,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.25)",
+  },
+  warningBody: { flex: 1 },
+  warningLabel: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: Colors.warning,
+  },
+  warningSummary: {
+    fontSize: 12,
+    color: "rgba(245, 158, 11, 0.85)",
+    marginTop: 2,
+    lineHeight: 17,
+  },
+
+  /* Cancelled row */
+  cancelledRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    marginTop: 12,
+    backgroundColor: "rgba(96, 105, 119, 0.15)",
+    borderRadius: 8,
+    padding: 10,
+  },
+  cancelledSummary: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.textMuted,
+    lineHeight: 17,
+  },
 
   /* Cancel run */
   cancelRunBtn: {

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -19,17 +19,22 @@ import {
   Clock,
   XCircle,
   History,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
 } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
-import type { Run, RunStatus, Agent } from "@/lib/database";
+import type { Run, RunStatus, Agent, Channel } from "@/lib/database";
 import {
   useRuns,
   useAgents,
   useCancelRun,
   useRealtimeInvalidation,
+  useChannelsAll,
   qk,
 } from "@/lib/hooks";
 import { useToast } from "@/components/Toast";
+import { timeAgo } from "@/lib/format";
 
 // ── Status badge config ───────────────────────────────────────────
 
@@ -105,7 +110,12 @@ export default function HistoryScreen() {
   const cancelRun = useCancelRun();
   useRealtimeInvalidation("runs", qk.runs);
 
+  const allChannels = useChannelsAll();
+
   const runData: Run[] = runs.data ?? [];
+
+  // Track which runs have their channel list expanded
+  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
 
   // Build agent lookup
   const agentMap = useMemo(() => {
@@ -115,6 +125,22 @@ export default function HistoryScreen() {
     }
     return map;
   }, [agents.data]);
+
+  // Build channels-by-agent lookup for per-run diagnostics
+  const channelsByAgentMap = useMemo(() => {
+    const map = new Map<string, Channel[]>();
+    if (allChannels.data) {
+      for (const ch of allChannels.data) {
+        const list = map.get(ch.agent_id);
+        if (list) {
+          list.push(ch);
+        } else {
+          map.set(ch.agent_id, [ch]);
+        }
+      }
+    }
+    return map;
+  }, [allChannels.data]);
 
   return (
     <View style={[styles.root, isWide && styles.rootWide, { paddingTop: insets.top + 12 }]}>
@@ -168,6 +194,22 @@ export default function HistoryScreen() {
             const agent = agentMap.get(item.agent_id);
             const isRunning = item.status === "running";
             const isCancelling = cancelRun.isPending && cancelRun.variables === item.id;
+            const isTerminal = item.status === "partial" || item.status === "failed" || item.status === "cancelled";
+            const isExpanded = expandedRuns.has(item.id);
+            const agentChannels = channelsByAgentMap.get(item.agent_id) ?? [];
+            const hasChannels = agentChannels.length > 0;
+
+            const toggleExpand = () => {
+              setExpandedRuns((prev) => {
+                const next = new Set(prev);
+                if (next.has(item.id)) {
+                  next.delete(item.id);
+                } else {
+                  next.add(item.id);
+                }
+                return next;
+              });
+            };
 
             return (
               <View style={styles.card}>
@@ -217,6 +259,12 @@ export default function HistoryScreen() {
                         {fmtCount(item.videos_new_count)}
                       </Text>
                     </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Channels: </Text>
+                      <Text style={styles.statValue}>
+                        {fmtCount(item.channels_scanned)} / {fmtCount(item.channels_total)}
+                      </Text>
+                    </View>
                   </View>
 
                   {/* Right column */}
@@ -235,6 +283,95 @@ export default function HistoryScreen() {
                     </View>
                   </View>
                 </View>
+
+                {/* Warning summary for partial runs */}
+                {item.status === "partial" && item.error_summary ? (
+                  <View style={styles.warningRow}>
+                    <AlertTriangle size={13} color={Colors.warning} />
+                    <Text style={styles.warningLabel}>Completed with issues</Text>
+                    <Text style={styles.warningSummary} numberOfLines={3}>
+                      {item.error_summary}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Error summary for failed runs */}
+                {item.status === "failed" && item.error_summary ? (
+                  <View style={styles.errorRow}>
+                    <XCircle size={13} color={Colors.destructive} />
+                    <Text style={styles.errorSummary} numberOfLines={3}>
+                      {item.error_summary}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Cancelled summary */}
+                {item.status === "cancelled" && item.error_summary ? (
+                  <View style={styles.cancelledRow}>
+                    <Ban size={13} color={Colors.textMuted} />
+                    <Text style={styles.cancelledSummary} numberOfLines={3}>
+                      {item.error_summary}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Expandable channel list for terminal runs */}
+                {isTerminal && hasChannels ? (
+                  <>
+                    <Pressable
+                      onPress={toggleExpand}
+                      style={({ pressed }) => [
+                        styles.expandToggle,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      {isExpanded ? (
+                        <ChevronUp size={14} color={Colors.textSecondary} />
+                      ) : (
+                        <ChevronDown size={14} color={Colors.textSecondary} />
+                      )}
+                      <Text style={styles.expandToggleLabel}>
+                        {isExpanded ? "Hide channels" : `Channels (${agentChannels.length})`}
+                      </Text>
+                    </Pressable>
+
+                    {isExpanded ? (
+                      <View style={styles.channelList}>
+                        {agentChannels.map((ch) => {
+                          const wasScanned =
+                            ch.last_scanned_at &&
+                            item.started_at &&
+                            ch.last_scanned_at >= item.started_at;
+                          return (
+                            <View key={ch.id} style={styles.channelRow}>
+                              <View
+                                style={[
+                                  styles.channelDot,
+                                  {
+                                    backgroundColor: wasScanned
+                                      ? Colors.success
+                                      : Colors.textMuted,
+                                  },
+                                ]}
+                              />
+                              <Text
+                                style={styles.channelRowName}
+                                numberOfLines={1}
+                              >
+                                {ch.channel_name ?? ch.channel_url ?? "Unnamed"}
+                              </Text>
+                              <Text style={styles.channelRowScanned}>
+                                {ch.last_scanned_at
+                                  ? timeAgo(ch.last_scanned_at)
+                                  : "Never"}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+                  </>
+                ) : null}
 
                 {/* Cancel button for running runs */}
                 {isRunning ? (
@@ -387,4 +524,113 @@ const styles = StyleSheet.create({
   },
   cancelButtonDisabled: { opacity: 0.5 },
   cancelLabel: { fontSize: 13, fontWeight: "600" as const, color: Colors.destructive },
+
+  // Pressed feedback
+  pressed: { opacity: 0.7 },
+
+  // Warning row (partial)
+  warningRow: {
+    marginTop: 12,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.25)",
+  },
+  warningLabel: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: Colors.warning,
+  },
+  warningSummary: {
+    fontSize: 12,
+    color: "rgba(245, 158, 11, 0.85)",
+    marginTop: 2,
+    lineHeight: 17,
+  },
+
+  // Error row (failed)
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    marginTop: 12,
+    backgroundColor: Colors.destructiveBg,
+    borderRadius: 8,
+    padding: 10,
+  },
+  errorSummary: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.destructive,
+    lineHeight: 17,
+  },
+
+  // Cancelled row
+  cancelledRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    marginTop: 12,
+    backgroundColor: "rgba(96, 105, 119, 0.15)",
+    borderRadius: 8,
+    padding: 10,
+  },
+  cancelledSummary: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.textMuted,
+    lineHeight: 17,
+  },
+
+  // Expand toggle
+  expandToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: Colors.input,
+    alignSelf: "flex-start",
+  },
+  expandToggleLabel: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+
+  // Channel list
+  channelList: {
+    marginTop: 8,
+    backgroundColor: Colors.input,
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  channelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  channelDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    flexShrink: 0,
+  },
+  channelRowName: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.textPrimary,
+  },
+  channelRowScanned: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    flexShrink: 0,
+  },
 });

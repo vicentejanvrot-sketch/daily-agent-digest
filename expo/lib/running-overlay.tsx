@@ -106,6 +106,7 @@ function useRunningOverlayState() {
               }));
             } else if (newStatus === "partial") {
               // Partial completion — some channels scanned, some failed
+              console.log("[run]", runId, "partial", row.error_summary);
               cleanupChannel();
               const count = (row.videos_new_count as number) ?? 0;
               setState((prev) => ({
@@ -117,6 +118,7 @@ function useRunningOverlayState() {
                     : "Scan finished — some channels couldn't be scanned.",
               }));
             } else if (newStatus === "failed" || newStatus === "cancelled") {
+              console.log("[run]", runId, newStatus, row.error_summary);
               cleanupChannel();
               setState((prev) => ({
                 ...prev,
