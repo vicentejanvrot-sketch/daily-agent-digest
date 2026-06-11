@@ -274,23 +274,25 @@ export default function FeedScreen() {
       </View>
 
       {/* ── Search bar ─────────────────────────────────────────── */}
-      <View style={styles.searchRow}>
-        <Search size={16} color={Colors.textMuted} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search videos, channels, tags..."
-          placeholderTextColor={Colors.textMuted}
-          value={search}
-          onChangeText={setSearch}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-        {search.length > 0 ? (
-          <Pressable onPress={() => setSearch("")} hitSlop={8} style={styles.searchClear}>
-            <X size={14} color={Colors.textMuted} />
-          </Pressable>
-        ) : null}
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchRow}>
+          <Search size={16} color={Colors.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search videos, channels, tags..."
+            placeholderTextColor={Colors.textMuted}
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {search.length > 0 ? (
+            <Pressable onPress={() => setSearch("")} hitSlop={8} style={styles.searchClear}>
+              <X size={14} color={Colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       {/* ── Filter dropdowns — vertical stack ───────────────────── */}
@@ -772,14 +774,17 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
 
-  // Search
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
+  // Search wrapper (aligns search with filters)
+  searchWrapper: {
+    paddingHorizontal: 16,
     maxWidth: 720,
     width: "100%",
     marginBottom: 10,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "stretch",
     backgroundColor: Colors.input,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
