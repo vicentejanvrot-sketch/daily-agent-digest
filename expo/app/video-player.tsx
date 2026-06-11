@@ -108,7 +108,7 @@ export default function VideoPlayerScreen() {
   }>();
   const insets = useSafeAreaInsets();
   const updateStatus = useUpdateItemStatus();
-  const { showToast } = useToast();
+  const showToast = useToast();
 
   // Shared quality / speed prefs (synced with Settings screen)
   const { quality, setQuality, speed, setSpeed, ready: prefsReady } = useVideoQuality();

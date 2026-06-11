@@ -237,9 +237,9 @@ export default function HistoryScreen() {
                     onPress={() => {
                       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                       cancelRun.mutate(item.id, {
-                        onSuccess: () => toast.show("Run cancelled", "success"),
+                        onSuccess: () => toast("Run cancelled", "success"),
                         onError: () =>
-                          toast.show("Failed to cancel run", "error"),
+                          toast("Failed to cancel run", "error"),
                       });
                     }}
                     disabled={isCancelling}

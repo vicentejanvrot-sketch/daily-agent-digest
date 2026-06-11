@@ -164,7 +164,7 @@ export default function LoginScreen() {
             style={({ pressed }) => [styles.linkWrap, styles.linkWrapSecondary, pressed && { opacity: 0.6 }]}
             onPress={() => router.push("/auth/signup")}
           >
-            <Text style={styles.linkSecondary}>Don't have an account? Sign up</Text>
+            <Text style={styles.linkSecondary}>Don&apos;t have an account? Sign up</Text>
           </Pressable>
         </View>
       </ScrollView>

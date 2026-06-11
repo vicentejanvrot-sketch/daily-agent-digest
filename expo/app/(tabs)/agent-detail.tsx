@@ -1045,7 +1045,7 @@ export default function AgentDetailScreen() {
         ) : runs.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>
-              No runs yet. Tap "Run Now" to start one.
+              No runs yet. Tap &ldquo;Run Now&rdquo; to start one.
             </Text>
           </View>
         ) : (
