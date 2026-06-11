@@ -41,7 +41,7 @@ import {
 } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-provider";
-import { useUserSettings, useUpdateSettings, useUserSettingsSafe, useDeleteAccount } from "@/lib/hooks";
+import { useUserSettings, useUpdateSettings, useUserSettingsSafe, useDeleteAccount, useDeleteApiKey } from "@/lib/hooks";
 import { useToast } from "@/components/Toast";
 import { useYouTubeConnection } from "@/lib/useYouTubeConnection";
 import { useVideoQuality, QUALITY_KEYS, QUALITY_LABELS } from "@/lib/useVideoQuality";
@@ -124,6 +124,7 @@ export default function SettingsScreen() {
   // YouTube connection state
   const yt = useYouTubeConnection();
   const deleteAccount = useDeleteAccount();
+  const deleteKey = useDeleteApiKey();
 
   // Shared video quality pref (synced with in-player gear menu)
   const { quality: videoQuality, setQuality: persistQuality, ready: qualityReady } = useVideoQuality();
@@ -416,9 +417,46 @@ export default function SettingsScreen() {
                   <View style={styles.fieldLabelRow}>
                     <Text style={styles.fieldLabel}>{def.label}</Text>
                     {saved && (
-                      <View style={styles.keySavedBadge}>
-                        <Text style={styles.keySavedBadgeText}>Saved</Text>
-                      </View>
+                      <>
+                        <View style={styles.keySavedBadge}>
+                          <Text style={styles.keySavedBadgeText}>Saved</Text>
+                        </View>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.keyDeleteBtn,
+                            pressed && styles.keyDeleteBtnPressed,
+                            deleteKey.isPending && styles.disabled,
+                          ]}
+                          onPress={() => {
+                            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            Alert.alert(
+                              `Delete ${def.label}?`,
+                              "This will remove the saved key. You can enter a new one at any time.",
+                              [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                  text: "Delete",
+                                  style: "destructive",
+                                  onPress: async () => {
+                                    try {
+                                      await deleteKey.mutateAsync(def.key);
+                                      showToast(`${def.label} removed.`, "success");
+                                    } catch (err: any) {
+                                      showToast(
+                                        err?.message ?? "Failed to delete key.",
+                                        "error",
+                                      );
+                                    }
+                                  },
+                                },
+                              ],
+                            );
+                          }}
+                          hitSlop={6}
+                        >
+                          <Trash2 size={13} color={Colors.destructive} />
+                        </Pressable>
+                      </>
                     )}
                   </View>
                   {masked && (
@@ -874,6 +912,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700" as const,
     color: Colors.success,
+  },
+  keyDeleteBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 5,
+    backgroundColor: "hsla(0, 72%, 51%, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  keyDeleteBtnPressed: {
+    opacity: 0.7,
+    backgroundColor: "hsla(0, 72%, 51%, 0.22)",
   },
   keyMaskedText: {
     fontSize: 11,

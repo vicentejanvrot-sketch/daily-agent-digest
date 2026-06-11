@@ -741,5 +741,32 @@ export function useDeleteAccount() {
   });
 }
 
+/**
+ * Delete a single API key by setting its column to null.
+ * Accepts the column name (e.g. "youtube_api_key") and performs
+ * a targeted upsert so the safe view immediately reflects the removal.
+ */
+export function useDeleteApiKey() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (keyColumn: string) => {
+      const { error } = await supabase
+        .from("user_settings")
+        .upsert(
+          { user_id: user?.id, [keyColumn]: null },
+          { onConflict: "user_id" },
+        );
+      if (error) {
+        throw new Error("Failed to delete key. Please try again.");
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: qk.safeSettings });
+    },
+  });
+}
+
 /** Re-fetch a query whenever its screen regains focus. */
 export { useFocusEffect } from "expo-router";
