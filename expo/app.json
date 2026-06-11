@@ -25,7 +25,15 @@
       "package": "app.rork.je0yu8oeyjzcpim4k10q0"
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Daily Agent Digest",
+      "shortName": "Daily Agent Digest",
+      "description": "Daily Agent Digest — AI agents that scan your channels and surface the new videos worth watching, all in one daily feed.",
+      "themeColor": "#0B1220",
+      "backgroundColor": "#0B1220",
+      "display": "standalone"
     },
     "plugins": [
       [

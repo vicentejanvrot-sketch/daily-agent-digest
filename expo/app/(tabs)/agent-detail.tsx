@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -68,6 +67,7 @@ import {
   type ChannelFilterKey,
 } from "@/components/ChannelStatusPill";
 import { timeAgo } from "@/lib/format";
+import { openExternalLink } from "@/lib/open-link";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -748,7 +748,7 @@ export default function AgentDetailScreen() {
 
   const handleOpenUrl = useCallback((url: string | null) => {
     if (!url) return;
-    void Linking.openURL(url);
+    void openExternalLink(url);
   }, []);
 
   const refreshing =

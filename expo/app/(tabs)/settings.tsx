@@ -46,6 +46,7 @@ import { useUserSettings, useUpdateSettings, useUserSettingsSafe, useDeleteAccou
 import { useToast } from "@/components/Toast";
 import { useYouTubeConnection } from "@/lib/useYouTubeConnection";
 import { useVideoQuality, QUALITY_KEYS, QUALITY_LABELS } from "@/lib/useVideoQuality";
+import { openExternalLink } from "@/lib/open-link";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -239,7 +240,7 @@ export default function SettingsScreen() {
   const handleOpenLink = useCallback(
     async (url: string) => {
       try {
-        await Linking.openURL(url);
+        await openExternalLink(url);
       } catch {
         showToast("Couldn't open link", "error");
       }

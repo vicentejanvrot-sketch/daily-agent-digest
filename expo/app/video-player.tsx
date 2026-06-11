@@ -37,6 +37,7 @@ import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/colors";
 import { useUpdateItemStatus } from "@/lib/hooks";
 import { useToast } from "@/components/Toast";
+import { openExternalLink } from "@/lib/open-link";
 import {
   useVideoQuality,
   QUALITY_KEYS,
@@ -271,7 +272,7 @@ export default function VideoPlayerScreen() {
   const handleOpenInYoutube = useCallback(async () => {
     if (!videoIdStr) return;
     try {
-      await Linking.openURL(`https://www.youtube.com/watch?v=${videoIdStr}`);
+      await openExternalLink(`https://www.youtube.com/watch?v=${videoIdStr}`);
     } catch {
       showToast("Couldn't open link", "error");
     }

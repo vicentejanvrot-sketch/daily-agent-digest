@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ChevronLeft } from "lucide-react-native";
 import { AuthProvider, useAuth } from "@/lib/auth-provider";
@@ -15,6 +15,34 @@ import { Colors } from "@/constants/colors";
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+/**
+ * Inject web-only global styles so the browser experience feels native:
+ * pointer cursors + subtle hover feedback on interactive elements, smooth
+ * wheel scrolling, and a dark theme base behind the SPA. No-op on native.
+ */
+function useWebGlobalStyles(): void {
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const styleId = "dad-web-global-styles";
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      html, body, #root { height: 100%; background-color: ${Colors.background}; }
+      body { margin: 0; overscroll-behavior-y: none; }
+      * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
+      *::-webkit-scrollbar { width: 10px; height: 10px; }
+      *::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.18); border-radius: 8px; }
+      *::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.3); }
+      [role="button"], [role="link"], a, button, summary { cursor: pointer; }
+      [role="button"]:hover, [role="link"]:hover { opacity: 0.85; transition: opacity 0.15s ease; }
+      input, textarea { outline: none; }
+      input::placeholder, textarea::placeholder { color: ${Colors.textMuted}; }
+    `;
+    document.head.appendChild(style);
+  }, []);
+}
 
 function AuthGate() {
   const { status } = useAuth();
@@ -119,6 +147,7 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
+  useWebGlobalStyles();
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

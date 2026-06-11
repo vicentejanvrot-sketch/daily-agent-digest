@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -265,7 +266,11 @@ export function RunningOverlay() {
       <View style={styles.modalFill}>
         {/* Dimmed + blurred backdrop */}
         <Animated.View style={[styles.backdrop, { opacity }]}>
-          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          {Platform.OS === "web" ? (
+            <View style={styles.backdropWeb} />
+          ) : (
+            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          )}
           <View style={styles.backdropFill} />
         </Animated.View>
 
@@ -462,6 +467,10 @@ const styles = StyleSheet.create({
   backdropFill: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.75)",
+  },
+  backdropWeb: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(8,12,20,0.85)",
   },
   dismissLayer: {
     ...StyleSheet.absoluteFillObject,
