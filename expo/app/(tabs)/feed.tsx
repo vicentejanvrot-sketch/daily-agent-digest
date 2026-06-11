@@ -232,24 +232,30 @@ export default function FeedScreen() {
     [],
   );
 
-  // ── Channel dropdown options (with badge counts + thumbnails) ───
-  const channelOptions = useMemo(
-    () => [
+  // ── Channel dropdown options (deduped by channel_id, with badge counts + thumbnails) ───
+  const channelOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const deduped = visibleChannels.filter((ch) => {
+      const cid = (ch.channel_id ?? ch.id) as string;
+      if (seen.has(cid)) return false;
+      seen.add(cid);
+      return true;
+    });
+    return [
       {
         key: "all" as const,
         label: "All Channels",
         badge: allItems.length,
       },
-      ...visibleChannels.map((ch) => ({
+      ...deduped.map((ch) => ({
         key: (ch.channel_id ?? ch.id) as string,
         label: channelDisplayName(ch),
         badge: channelCounts[ch.channel_id ?? ""] ?? 0,
         thumbnail: ch.channel_thumbnail ?? undefined,
         thumbnailText: (ch.channel_name ?? "?")[0].toUpperCase(),
       })),
-    ],
-    [visibleChannels, channelCounts, allItems.length],
-  );
+    ];
+  }, [visibleChannels, channelCounts, allItems.length]);
 
   // ── Render ──────────────────────────────────────────────────────
 
