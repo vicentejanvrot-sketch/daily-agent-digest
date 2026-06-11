@@ -289,13 +289,14 @@ export default function VideoPlayerScreen() {
   const embeddedWidth = Math.min(windowWidth, PLAYER_MAX_WIDTH);
   const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
 
-  // Fullscreen player sizing — 16:9 that fits the current window (iPad may stay portrait)
-  const fullscreenByWidth = Math.round(windowWidth / (16 / 9));
-  const fullscreenByHeight = Math.round(windowHeight * (16 / 9));
-  const fullscreenPlayerWidth =
-    fullscreenByWidth <= windowHeight ? windowWidth : fullscreenByHeight;
-  const fullscreenPlayerHeight =
-    fullscreenByWidth <= windowHeight ? fullscreenByWidth : windowHeight;
+  // Fullscreen player sizing — always fill the screen as a landscape rectangle.
+  // On iPad the OS may refuse orientation lock (supportsTablet), so we compute
+  // long/short edges from the current window and rotate in software when needed.
+  const longEdge = Math.max(windowWidth, windowHeight);
+  const shortEdge = Math.min(windowWidth, windowHeight);
+  const isPortraitWindow = windowHeight >= windowWidth;
+  const landscapeWidth = longEdge;
+  const landscapeHeight = shortEdge;
 
   const handleClose = useCallback(() => {
     router.back();
@@ -634,16 +635,19 @@ export default function VideoPlayerScreen() {
             style={[
               styles.fullscreenPlayerInner,
               {
-                width: fullscreenPlayerWidth,
-                height: fullscreenPlayerHeight,
+                width: landscapeWidth,
+                height: landscapeHeight,
+              },
+              isFullscreen && isPortraitWindow && {
+                transform: [{ rotate: "90deg" }],
               },
             ]}
           >
             <VideoPlayerContent
               ref={playerRef}
               videoId={videoIdStr}
-              width={fullscreenPlayerWidth}
-              height={fullscreenPlayerHeight}
+              width={landscapeWidth}
+              height={landscapeHeight}
               playbackRate={playbackRate}
               onReady={() => {
                 setReady(true);
@@ -1055,7 +1059,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.black,
     zIndex: 100,
-    overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
   },
