@@ -1,5 +1,6 @@
 import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
 import React, { useRef, useImperativeHandle, forwardRef, useCallback, useState } from "react";
+import { View } from "react-native";
 
 // ── Public ref API ─────────────────────────────────────────────────
 
@@ -44,7 +45,9 @@ const INJECTED_JS = `
   });
   (function enforceFill(){
     var s=document.createElement('style');
-    s.textContent='body,html{margin:0!important;padding:0!important} iframe{width:100%!important;height:100%!important}';
+    s.textContent='html,body{margin:0!important;padding:0!important;background:#000!important;overflow:hidden!important}'+
+      ' iframe{display:block!important;width:100%!important;height:100%!important}'+
+      ' .ytp-chrome-top,.ytp-chrome-bottom{display:none!important}';
     document.head.appendChild(s);
   })();
   true;
@@ -74,11 +77,18 @@ interface VideoPlayerContentProps {
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
-    { videoId, width, height = 220, playbackRate = 1, onReady, onError, onChangeState },
+    { videoId, width, height: _height, playbackRate = 1, onReady, onError, onChangeState },
     ref,
   ) {
     const youtubeRef = useRef<YoutubeIframeRef | null>(null);
     const [shouldPlay, setShouldPlay] = useState(false);
+
+    // Force the player into an exact 16:9 box derived from width only.
+    // The incoming height prop is accepted for backward compat but NOT
+    // used to size the player — this prevents the WebView from becoming
+    // wider than 16:9 and causing YouTube's own pillarboxing (black side bars).
+    const boxWidth = width ?? 0;
+    const boxHeight = Math.round(boxWidth * 9 / 16);
 
     const play = useCallback(async () => {
       setShouldPlay(true);
@@ -113,36 +123,46 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     }), [play, pause, seekTo]);
 
     return (
-      <YoutubeIframe
-        ref={youtubeRef}
-        width={width}
-        height={height}
-        videoId={videoId}
-        play={shouldPlay}
-        playbackRate={playbackRate}
-        onReady={onReady}
-        onError={onError}
-        onChangeState={onChangeState}
-        webViewProps={{
-          allowsInlineMediaPlayback: true,
-          mediaPlaybackRequiresUserAction: true,
-          injectedJavaScript: INJECTED_JS,
-          style: { width: width as number, height: height as number, backgroundColor: 'transparent' },
-          userAgent:
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-          allowsFullscreenVideo: true,
-          domStorageEnabled: true,
-          thirdPartyCookiesEnabled: true,
+      <View
+        style={{
+          width: boxWidth,
+          height: boxHeight,
+          alignSelf: "center",
+          overflow: "hidden",
+          backgroundColor: "#000",
         }}
-        initialPlayerParams={{
-          controls: false,
-          modestbranding: 1,
-          rel: 0,
-          playsinline: 1,
-          preventFullScreen: true,
-          origin: "https://www.youtube.com",
-        }}
-      />
+      >
+        <YoutubeIframe
+          ref={youtubeRef}
+          width={boxWidth}
+          height={boxHeight}
+          videoId={videoId}
+          play={shouldPlay}
+          playbackRate={playbackRate}
+          onReady={onReady}
+          onError={onError}
+          onChangeState={onChangeState}
+          webViewProps={{
+            allowsInlineMediaPlayback: true,
+            mediaPlaybackRequiresUserAction: true,
+            injectedJavaScript: INJECTED_JS,
+            style: { width: boxWidth, height: boxHeight, backgroundColor: "transparent" },
+            userAgent:
+              "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+            allowsFullscreenVideo: true,
+            domStorageEnabled: true,
+            thirdPartyCookiesEnabled: true,
+          }}
+          initialPlayerParams={{
+            controls: false,
+            modestbranding: 1,
+            rel: 0,
+            playsinline: 1,
+            preventFullScreen: true,
+            origin: "https://www.youtube.com",
+          }}
+        />
+      </View>
     );
   },
 );

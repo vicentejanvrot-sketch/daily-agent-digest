@@ -344,17 +344,8 @@ export default function VideoPlayerScreen() {
   // Embedded (non-fullscreen) player sizing — 16:9, full-width on tablet/desktop
   const EMBED_H_MARGIN = windowWidth >= 700 ? 24 : 0;
   const embeddedWidth = Math.min(windowWidth - EMBED_H_MARGIN * 2, PLAYER_MAX_WIDTH);
-  const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
-
-  // Fullscreen player sizing — 16:9 letterbox from live window dimensions.
-  // Recomputes on rotation so flipping the device re-fits the video.
-  let fullscreenWidth = windowWidth;
-  let fullscreenHeight = Math.round(windowWidth * 9 / 16);
-  // Safety cap: if computed height exceeds the available screen height, clamp
-  if (fullscreenHeight > windowHeight) {
-    fullscreenHeight = windowHeight;
-    fullscreenWidth = Math.round(windowHeight * 16 / 9);
-  }
+  // embeddedHeight is no longer needed — VideoPlayerContent derives
+  // its own 16:9 height from width alone (see VideoPlayerContent.native.tsx).
 
   const handleClose = useCallback(() => {
     router.back();
@@ -808,16 +799,16 @@ export default function VideoPlayerScreen() {
             style={[
               styles.fullscreenPlayerInner,
               {
-                width: fullscreenWidth,
-                height: fullscreenHeight,
+                width: windowWidth,
+                height: windowHeight,
               },
             ]}
           >
             <VideoPlayerContent
               ref={playerRef}
               videoId={videoIdStr}
-              width={fullscreenWidth}
-              height={fullscreenHeight}
+              width={windowWidth}
+              height={windowHeight}
               playbackRate={playbackRate}
               onReady={() => {
                 setReady(true);
@@ -853,7 +844,6 @@ export default function VideoPlayerScreen() {
               ref={playerRef}
               videoId={videoIdStr}
               width={embeddedWidth}
-              height={embeddedHeight}
               playbackRate={playbackRate}
               onReady={() => {
                 setReady(true);
