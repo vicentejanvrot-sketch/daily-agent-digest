@@ -23,13 +23,14 @@ export interface VideoPlayerHandle {
 }
 
 /**
- * JavaScript injected into the WebView that adds a supplementary
- * message-event listener.  The library's built-in listener only
- * handles playVideo / pauseVideo / muteVideo / unMuteVideo, so
- * we catch setPlaybackRate (and setVolume) here and forward them
- * to the YouTube IFrame API player directly.
+ * Injected JavaScript that adds a supplementary message-event listener
+ * so the library's setPlaybackRate / setVolume are forwarded to the
+ * YouTube IFrame API player, AND injects a <style> tag to remove any
+ * default body margins / iframe size constraints that would cause
+ * letterboxing on the wrong axis (left/right dead space instead of
+ * top/bottom).
  */
-const INJECTED_SPEED_HANDLER = `
+const INJECTED_JS = `
 (function(){
   window.addEventListener('message',function(e){
     try{
@@ -41,6 +42,11 @@ const INJECTED_SPEED_HANDLER = `
       }
     }catch(_){}
   });
+  (function enforceFill(){
+    var s=document.createElement('style');
+    s.textContent='body,html{margin:0!important;padding:0!important} iframe{width:100%!important;height:100%!important}';
+    document.head.appendChild(s);
+  })();
   true;
 })();
 `;
@@ -90,7 +96,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       inject: (_js: string) => {
         // On native the library overrides webViewProps.ref, so we
         // cannot inject JS directly.  Instead the injected JavaScript
-        // handler (INJECTED_SPEED_HANDLER) catches the library's own
+        // handler (INJECTED_JS) catches the library's own
         // sendPostMessage calls for setPlaybackRate / setVolume and
         // forwards them to window.player.  This method is a no-op on
         // native; the web platform file uses eval() for injection.
@@ -120,7 +126,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
         webViewProps={{
           allowsInlineMediaPlayback: true,
           mediaPlaybackRequiresUserAction: true,
-          injectedJavaScript: INJECTED_SPEED_HANDLER,
+          injectedJavaScript: INJECTED_JS,
+          style: { width: width as number, height: height as number, backgroundColor: 'transparent' },
           userAgent:
             "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
           allowsFullscreenVideo: true,
