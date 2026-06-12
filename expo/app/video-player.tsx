@@ -74,9 +74,6 @@ const STATUS_ENTRIES = Object.entries(STATUS_ICONS) as [
   (typeof STATUS_ICONS)[ItemStatus],
 ][];
 
-/** Maximum player width on large screens so the player doesn't stretch across a big monitor/iPad. */
-const PLAYER_MAX_WIDTH = 720;
-
 /** Compact labels for the inline speed pill row. */
 const SPEED_PILL_LABELS: Record<SpeedKey, string> = {
   "1": "1\u00D7",
@@ -343,7 +340,7 @@ export default function VideoPlayerScreen() {
 
   // Embedded (non-fullscreen) player sizing — 16:9, full-width on tablet/desktop
   const EMBED_H_MARGIN = windowWidth >= 700 ? 24 : 0;
-  const embeddedWidth = Math.min(windowWidth - EMBED_H_MARGIN * 2, PLAYER_MAX_WIDTH);
+  const embeddedWidth = windowWidth - EMBED_H_MARGIN * 2;
   // embeddedHeight is no longer needed — VideoPlayerContent derives
   // its own 16:9 height from width alone (see VideoPlayerContent.native.tsx).
 

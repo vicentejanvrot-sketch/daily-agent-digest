@@ -45,8 +45,8 @@ const INJECTED_JS = `
   });
   (function enforceFill(){
     var s=document.createElement('style');
-    s.textContent='html,body{margin:0!important;padding:0!important;background:#000!important;overflow:hidden!important}'+
-      ' iframe{display:block!important;width:100%!important;height:100%!important}'+
+    s.textContent='html,body{margin:0!important;padding:0!important;background:#000!important;overflow:hidden!important;width:100%!important;height:100%!important}'+
+      ' iframe{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;left:0!important}'+
       ' .ytp-chrome-top,.ytp-chrome-bottom{display:none!important}';
     document.head.appendChild(s);
   })();
