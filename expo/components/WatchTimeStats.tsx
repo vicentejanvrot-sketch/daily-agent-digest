@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import {
   ActivityIndicator,
+  LayoutChangeEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,7 +9,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Rect, Circle, Line, Text as SvgText, G, Path } from "react-native-svg";
-import { format, parse } from "date-fns";
+
 import {
   BarChart3,
   ChevronDown,
@@ -330,193 +331,255 @@ function WeeklyCard({ wc }: { wc: WeeklyComparison }) {
 // ── Daily Bar Chart (react-native-svg) ─────────────────────────────
 
 const BAR_CHART_HEIGHT = 180;
-const BAR_CHART_BAR_WIDTH = 10;
-const BAR_CHART_GAP = 3;
+const BAR_CHART_MARGIN = 32;
+const BAR_CHART_GAP = 2;
+const BAR_CHART_MIN_BAR_WIDTH = 4;
 
 function DailyBarChart({ data }: { data: DailyBucket[] }) {
+  const [containerWidth, setContainerWidth] = useState(0);
+
   const maxHours = useMemo(() => {
     let max = 0;
     for (const d of data) {
-      const total = (d.watchedSeconds + d.unwatchedSeconds) / 3600;
+      const total = d.watchedHours + d.unwatchedHours;
       if (total > max) max = total;
     }
     return max > 0 ? max : 1;
   }, [data]);
 
-  // Calculate chart width based on number of bars
-  const chartWidth = data.length * (BAR_CHART_BAR_WIDTH * 2 + BAR_CHART_GAP) + 30;
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    setContainerWidth(e.nativeEvent.layout.width);
+  }, []);
 
-  // Only show every Nth label to avoid crowding
+  const barWidth = useMemo(() => {
+    if (data.length === 0 || containerWidth <= BAR_CHART_MARGIN * 2) return 0;
+    const avail = containerWidth - BAR_CHART_MARGIN * 2;
+    const w = (avail - (data.length - 1) * BAR_CHART_GAP) / data.length;
+    return Math.max(BAR_CHART_MIN_BAR_WIDTH, w);
+  }, [data.length, containerWidth]);
+
+  const totalWidth = useMemo(
+    () => data.length * (barWidth + BAR_CHART_GAP) - BAR_CHART_GAP + BAR_CHART_MARGIN * 2,
+    [data.length, barWidth],
+  );
+
   const labelInterval = Math.max(1, Math.floor(data.length / 5));
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <Svg width={chartWidth + 40} height={BAR_CHART_HEIGHT + 40}>
-        {/* Y-axis labels */}
-        {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
-          const y = BAR_CHART_HEIGHT - frac * BAR_CHART_HEIGHT + 10;
-          return (
-            <SvgText
-              key={frac}
-              x={8}
-              y={y + 4}
-              fill={Colors.textMuted}
-              fontSize={9}
-            >
-              {Math.round(maxHours * frac)}h
-            </SvgText>
-          );
-        })}
-        {/* Bars */}
-        {data.map((d, i) => {
-          const x = 30 + i * (BAR_CHART_BAR_WIDTH * 2 + BAR_CHART_GAP);
-          const watchedH = d.watchedSeconds / 3600;
-          const unwatchedH = d.unwatchedSeconds / 3600;
-          const watchedHeight = (watchedH / maxHours) * BAR_CHART_HEIGHT;
-          const unwatchedHeight = (unwatchedH / maxHours) * BAR_CHART_HEIGHT;
-          const totalHeight = watchedHeight + unwatchedHeight;
-
-          return (
-            <G key={d.date}>
-              {/* Watched (bottom of stack) */}
-              {watchedHeight > 0 && (
-                <Rect
-                  x={x}
-                  y={10 + BAR_CHART_HEIGHT - watchedHeight}
-                  width={BAR_CHART_BAR_WIDTH}
-                  height={watchedHeight}
-                  fill={chartWatched}
-                  rx={0}
-                />
-              )}
-              {/* Not Watched (stacked on top) */}
-              {unwatchedHeight > 0 && (
-                <Rect
-                  x={x}
-                  y={10 + BAR_CHART_HEIGHT - totalHeight}
-                  width={BAR_CHART_BAR_WIDTH}
-                  height={unwatchedHeight}
-                  fill={chartUnwatched}
-                  rx={0}
-                />
-              )}
-              {/* X-axis label */}
-              {i % labelInterval === 0 ? (
+    <View onLayout={onLayout} style={{ width: "100%" }}>
+      {containerWidth > 0 && barWidth > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <Svg width={totalWidth} height={BAR_CHART_HEIGHT + 40}>
+            {/* Y-axis labels */}
+            {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
+              const y = BAR_CHART_HEIGHT - frac * BAR_CHART_HEIGHT + 10;
+              return (
                 <SvgText
-                  x={x + BAR_CHART_BAR_WIDTH / 2}
-                  y={BAR_CHART_HEIGHT + 28}
+                  key={frac}
+                  x={8}
+                  y={y + 4}
                   fill={Colors.textMuted}
                   fontSize={9}
-                  textAnchor="middle"
                 >
-                  {formatShortDate(d.date)}
+                  {Math.round(maxHours * frac)}h
                 </SvgText>
-              ) : null}
-            </G>
-          );
-        })}
-      </Svg>
-    </ScrollView>
+              );
+            })}
+            {/* Bars */}
+            {data.map((d, i) => {
+              const x = BAR_CHART_MARGIN + i * (barWidth + BAR_CHART_GAP);
+              const watchedH = d.watchedHours;
+              const unwatchedH = d.unwatchedHours;
+              const watchedHeight = maxHours > 0 ? (watchedH / maxHours) * BAR_CHART_HEIGHT : 0;
+              const unwatchedHeight = maxHours > 0 ? (unwatchedH / maxHours) * BAR_CHART_HEIGHT : 0;
+              const totalHeight = watchedHeight + unwatchedHeight;
+
+              return (
+                <G key={d.date}>
+                  {/* Not Watched (behind, full stack) */}
+                  {unwatchedHeight > 0 && (
+                    <Rect
+                      x={x}
+                      y={10 + BAR_CHART_HEIGHT - totalHeight}
+                      width={barWidth}
+                      height={totalHeight}
+                      fill={chartUnwatched}
+                      rx={1}
+                    />
+                  )}
+                  {/* Watched (on top, bottom portion) */}
+                  {watchedHeight > 0 && (
+                    <Rect
+                      x={x}
+                      y={10 + BAR_CHART_HEIGHT - watchedHeight}
+                      width={barWidth}
+                      height={watchedHeight}
+                      fill={chartWatched}
+                      rx={1}
+                    />
+                  )}
+                  {/* Zero-height day: show a faint baseline tick */}
+                  {totalHeight === 0 && (
+                    <Rect
+                      x={x + barWidth / 2 - 1}
+                      y={10 + BAR_CHART_HEIGHT - 1}
+                      width={2}
+                      height={1}
+                      fill={Colors.textMuted}
+                      rx={0}
+                    />
+                  )}
+                  {/* X-axis label */}
+                  {i % labelInterval === 0 ? (
+                    <SvgText
+                      x={x + barWidth / 2}
+                      y={BAR_CHART_HEIGHT + 28}
+                      fill={Colors.textMuted}
+                      fontSize={9}
+                      textAnchor="middle"
+                    >
+                      {d.dateLabel}
+                    </SvgText>
+                  ) : null}
+                </G>
+              );
+            })}
+          </Svg>
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
 // ── Daily Area Chart (react-native-svg) ─────────────────────────────
 
 const AREA_CHART_HEIGHT = 160;
+const AREA_CHART_MARGIN = 32;
 
 function DailyAreaChart({ data }: { data: DailyBucket[] }) {
+  const [containerWidth, setContainerWidth] = useState(0);
+
   const maxHours = useMemo(() => {
     let max = 0;
     for (const d of data) {
-      const total = (d.watchedSeconds + d.unwatchedSeconds) / 3600;
+      const total = d.watchedHours + d.unwatchedHours;
       if (total > max) max = total;
     }
     return max > 0 ? max : 1;
   }, [data]);
 
-  const chartWidth = data.length > 0 ? data.length * 20 + 20 : 200;
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    setContainerWidth(e.nativeEvent.layout.width);
+  }, []);
+
   const labelInterval = Math.max(1, Math.floor(data.length / 5));
 
-  const watchedPoints = data
-    .map((d, i) => {
-      const x = 10 + i * 20;
-      const y = 10 + AREA_CHART_HEIGHT - ((d.watchedSeconds / 3600) / maxHours) * AREA_CHART_HEIGHT;
-      return `${x},${y}`;
-    })
-    .join(" ");
+  // Build point arrays once maxHours and containerWidth are known
+  const chartData = useMemo(() => {
+    if (data.length === 0 || containerWidth <= AREA_CHART_MARGIN * 2) return null;
 
-  const unwatchedPoints = data
-    .map((d, i) => {
-      const x = 10 + i * 20;
-      const totalH = (d.watchedSeconds + d.unwatchedSeconds) / 3600;
-      const y = 10 + AREA_CHART_HEIGHT - (totalH / maxHours) * AREA_CHART_HEIGHT;
-      return `${x},${y}`;
-    })
-    .join(" ");
+    const avail = containerWidth - AREA_CHART_MARGIN * 2;
+    const step = data.length > 1 ? avail / (data.length - 1) : avail;
 
-  // Build filled area paths
-  const watchedAreaPath = `${watchedPoints} ${10 + (data.length - 1) * 20},${10 + AREA_CHART_HEIGHT} 10,${10 + AREA_CHART_HEIGHT} Z`;
-  const unwatchedAreaPath = `${unwatchedPoints} ${10 + (data.length - 1) * 20},${10 + AREA_CHART_HEIGHT} 10,${10 + AREA_CHART_HEIGHT} Z`;
+    const baselineY = 10 + AREA_CHART_HEIGHT;
+
+    // Points for the total (watched + unwatched) line
+    const totalPoints = data.map((d, i) => {
+      const x = AREA_CHART_MARGIN + i * step;
+      const totalH = d.watchedHours + d.unwatchedHours;
+      const y = baselineY - (totalH / maxHours) * AREA_CHART_HEIGHT;
+      return { x, y };
+    });
+
+    // Points for the watched line only
+    const watchedPoints = data.map((d, i) => {
+      const x = AREA_CHART_MARGIN + i * step;
+      const y = baselineY - (d.watchedHours / maxHours) * AREA_CHART_HEIGHT;
+      return { x, y };
+    });
+
+    // Build SVG path strings
+    const pointsToD = (pts: { x: number; y: number }[]) =>
+      pts.map((p, idx) => (idx === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
+
+    const totalLine = pointsToD(totalPoints);
+    const watchedLine = pointsToD(watchedPoints);
+
+    // Stacked areas: total area (behind, orange), watched area (on top, green)
+    const firstX = AREA_CHART_MARGIN;
+    const lastX = AREA_CHART_MARGIN + (data.length - 1) * step;
+
+    const totalAreaPath = `${totalLine} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
+    const watchedAreaPath = `${watchedLine} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
+
+    return {
+      totalLine,
+      watchedLine,
+      totalAreaPath,
+      watchedAreaPath,
+      totalPoints,
+      watchedPoints,
+      step,
+    };
+  }, [data, maxHours, containerWidth]);
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <Svg width={chartWidth + 40} height={AREA_CHART_HEIGHT + 40}>
-        {/* Y-axis labels */}
-        {[0, 0.5, 1].map((frac) => {
-          const y = AREA_CHART_HEIGHT - frac * AREA_CHART_HEIGHT + 10;
-          return (
-            <SvgText
-              key={frac}
-              x={8}
-              y={y + 4}
-              fill={Colors.textMuted}
-              fontSize={9}
-            >
-              {Math.round(maxHours * frac)}h
-            </SvgText>
-          );
-        })}
-        {/* Unwatched area (behind) */}
-        <Path d={unwatchedAreaPath} fill={chartUnwatched} fillOpacity={0.5} />
-        {/* Unwatched line */}
-        <Path
-          d={unwatchedPoints
-            .split(" ")
-            .map((p, i) => (i === 0 ? `M ${p}` : `L ${p}`))
-            .join(" ")}
-          stroke={chartUnwatched}
-          strokeWidth={2}
-          fill="none"
-        />
-        {/* Watched area (behind) */}
-        <Path d={watchedAreaPath} fill={chartWatched} fillOpacity={0.5} />
-        {/* Watched line */}
-        <Path
-          d={watchedPoints
-            .split(" ")
-            .map((p, i) => (i === 0 ? `M ${p}` : `L ${p}`))
-            .join(" ")}
-          stroke={chartWatched}
-          strokeWidth={2}
-          fill="none"
-        />
-        {/* X-axis labels */}
-        {data.map((d, i) =>
-          i % labelInterval === 0 ? (
-            <SvgText
-              key={d.date}
-              x={10 + i * 20}
-              y={AREA_CHART_HEIGHT + 28}
-              fill={Colors.textMuted}
-              fontSize={9}
-              textAnchor="middle"
-            >
-              {formatShortDate(d.date)}
-            </SvgText>
-          ) : null,
-        )}
-      </Svg>
-    </ScrollView>
+    <View onLayout={onLayout} style={{ width: "100%" }}>
+      {containerWidth > 0 && chartData && (
+        <Svg width={containerWidth} height={AREA_CHART_HEIGHT + 40}>
+          {/* Y-axis labels */}
+          {[0, 0.5, 1].map((frac) => {
+            const y = AREA_CHART_HEIGHT - frac * AREA_CHART_HEIGHT + 10;
+            return (
+              <SvgText
+                key={frac}
+                x={8}
+                y={y + 4}
+                fill={Colors.textMuted}
+                fontSize={9}
+              >
+                {Math.round(maxHours * frac)}h
+              </SvgText>
+            );
+          })}
+          {/* Total area (orange, behind) */}
+          <Path d={chartData.totalAreaPath} fill={chartUnwatched} fillOpacity={0.4} />
+          {/* Watched area (green, on top) */}
+          <Path d={chartData.watchedAreaPath} fill={chartWatched} fillOpacity={0.5} />
+          {/* Total line (orange, top edge) */}
+          <Path
+            d={chartData.totalLine}
+            stroke={chartUnwatched}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            fill="none"
+          />
+          {/* Watched line (green) */}
+          <Path
+            d={chartData.watchedLine}
+            stroke={chartWatched}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            fill="none"
+          />
+          {/* X-axis labels */}
+          {data.map((d, i) =>
+            i % labelInterval === 0 ? (
+              <SvgText
+                key={d.date}
+                x={AREA_CHART_MARGIN + (data.length > 1 ? i * chartData.step : chartData.step / 2)}
+                y={AREA_CHART_HEIGHT + 28}
+                fill={Colors.textMuted}
+                fontSize={9}
+                textAnchor="middle"
+              >
+                {d.dateLabel}
+              </SvgText>
+            ) : null,
+          )}
+        </Svg>
+      )}
+    </View>
   );
 }
 
@@ -709,15 +772,7 @@ function ChannelRow({ channel }: { channel: ChannelBucket }) {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Format yyyy-MM-dd to "Mon DD" (short). */
-function formatShortDate(dateStr: string): string {
-  try {
-    const d = parse(dateStr, "yyyy-MM-dd", new Date());
-    return format(d, "MMM d");
-  } catch {
-    return dateStr;
-  }
-}
+
 
 // ── Styles ──────────────────────────────────────────────────────────
 

@@ -14,8 +14,11 @@ export type TimePeriod = "7d" | "30d" | "all";
 
 export interface DailyBucket {
   date: string;
+  dateLabel: string;
   watchedSeconds: number;
   unwatchedSeconds: number;
+  watchedHours: number;
+  unwatchedHours: number;
   watchedCount: number;
   unwatchedCount: number;
 }
@@ -138,6 +141,18 @@ export function useWatchTimeStats(period: TimePeriod = "all") {
         return emptyResult();
       }
 
+      // For "all" period, derive startDate from the earliest item
+      if (period === "all") {
+        let earliestMs = Infinity;
+        for (const r of itemRows) {
+          const t = new Date(r.created_at).getTime();
+          if (t < earliestMs) earliestMs = t;
+        }
+        if (earliestMs !== Infinity) {
+          startDate = startOfDay(new Date(earliestMs)).toISOString();
+        }
+      }
+
       // ── Fetch agents ─────────────────────────────────────────
       const { data: agentRows, error: agentsError } = await supabase
         .from("agents")
@@ -188,8 +203,11 @@ export function useWatchTimeStats(period: TimePeriod = "all") {
           const key = format(day, "yyyy-MM-dd");
           dailyMap.set(key, {
             date: key,
+            dateLabel: format(day, "MMM d"),
             watchedSeconds: 0,
             unwatchedSeconds: 0,
+            watchedHours: 0,
+            unwatchedHours: 0,
             watchedCount: 0,
             unwatchedCount: 0,
           });
@@ -347,7 +365,13 @@ export function useWatchTimeStats(period: TimePeriod = "all") {
       );
 
       const dailyTrend = startDate
-        ? Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+        ? Array.from(dailyMap.values())
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map((b) => ({
+              ...b,
+              watchedHours: b.watchedSeconds / 3600,
+              unwatchedHours: b.unwatchedSeconds / 3600,
+            }))
         : [];
 
       const weeklyComparison: WeeklyComparison = {
