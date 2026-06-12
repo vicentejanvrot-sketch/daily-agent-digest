@@ -958,7 +958,7 @@ export default function VideoPlayerScreen() {
           style={[
             styles.progressRow,
             isFullscreen && styles.progressRowFullscreen,
-            isFullscreen && { bottom: insets.bottom + 110 },
+            isFullscreen && { bottom: insets.bottom + 120 },
           ]}
         >
           <Text style={styles.progressTimeText}>
@@ -1432,7 +1432,6 @@ const styles = StyleSheet.create({
   },
   progressRowFullscreen: {
     position: "absolute",
-    bottom: 110,
     left: 0,
     right: 0,
     maxWidth: "100%",
@@ -1492,7 +1491,6 @@ const styles = StyleSheet.create({
   // ── Embedded controls row ───────────────────────────────────
   embeddedControlsRow: {
     width: "100%",
-    maxWidth: PLAYER_MAX_WIDTH,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
@@ -1581,7 +1579,6 @@ const styles = StyleSheet.create({
   // ── Status actions ──────────────────────────────────────────
   actionsRow: {
     width: "100%",
-    maxWidth: PLAYER_MAX_WIDTH,
     alignSelf: "center",
     flexDirection: "row",
     justifyContent: "space-evenly",
@@ -1610,7 +1607,6 @@ const styles = StyleSheet.create({
   // ── Open in YouTube row (when not connected) ────────────────
   openYoutubeRow: {
     width: "100%",
-    maxWidth: PLAYER_MAX_WIDTH,
     alignSelf: "center",
     alignItems: "center",
     paddingVertical: 4,
