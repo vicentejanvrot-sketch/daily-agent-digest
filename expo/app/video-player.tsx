@@ -341,6 +341,7 @@ export default function VideoPlayerScreen() {
   // Embedded (non-fullscreen) player sizing — 16:9, full-width on tablet/desktop
   const EMBED_H_MARGIN = windowWidth >= 700 ? 24 : 0;
   const embeddedWidth = windowWidth - EMBED_H_MARGIN * 2;
+  const embeddedHeight = Math.round(embeddedWidth / (16 / 9));
 
   // Fullscreen sizing — fill the full screen width edge-to-edge,
   // with black bars only on top/bottom (no pillarboxing).
@@ -850,6 +851,7 @@ export default function VideoPlayerScreen() {
               ref={playerRef}
               videoId={videoIdStr}
               width={embeddedWidth}
+              height={embeddedHeight}
               playbackRate={playbackRate}
               onReady={() => {
                 setReady(true);
