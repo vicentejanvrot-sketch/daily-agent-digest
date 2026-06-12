@@ -1,5 +1,5 @@
 import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
-import React, { useRef, useImperativeHandle, forwardRef } from "react";
+import React, { useRef, useImperativeHandle, forwardRef, useCallback, useState } from "react";
 
 // ── Public ref API ─────────────────────────────────────────────────
 
@@ -14,6 +14,12 @@ export interface VideoPlayerHandle {
   requestFullscreen: () => Promise<void>;
   /** Exit fullscreen if currently active. */
   exitFullscreen: () => Promise<void>;
+  /** Start or resume playback. */
+  play: () => Promise<void>;
+  /** Pause playback. */
+  pause: () => Promise<void>;
+  /** Seek to a specific time in seconds. */
+  seekTo: (seconds: number) => Promise<void>;
 }
 
 /**
@@ -56,6 +62,9 @@ interface VideoPlayerContentProps {
  * Accepts `playbackRate` to control speed and uses `webViewProps`
  * to capture a WebView ref so the parent can inject quality-change
  * JavaScript (`player.setPlaybackQuality('hd1080')` etc.).
+ *
+ * YouTube's native chrome is hidden (`controls: false`) so the parent
+ * can render its own custom transport overlay and progress bar.
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
@@ -63,6 +72,19 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     ref,
   ) {
     const youtubeRef = useRef<YoutubeIframeRef | null>(null);
+    const [shouldPlay, setShouldPlay] = useState(false);
+
+    const play = useCallback(async () => {
+      setShouldPlay(true);
+    }, []);
+
+    const pause = useCallback(async () => {
+      setShouldPlay(false);
+    }, []);
+
+    const seekTo = useCallback(async (seconds: number) => {
+      youtubeRef.current?.seekTo(seconds, true);
+    }, []);
 
     useImperativeHandle(ref, () => ({
       inject: (_js: string) => {
@@ -79,7 +101,10 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
         youtubeRef.current?.getDuration() ?? Promise.resolve(0),
       requestFullscreen: () => Promise.resolve(),
       exitFullscreen: () => Promise.resolve(),
-    }));
+      play,
+      pause,
+      seekTo,
+    }), [play, pause, seekTo]);
 
     return (
       <YoutubeIframe
@@ -87,7 +112,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
         width={width}
         height={height}
         videoId={videoId}
-        play={false}
+        play={shouldPlay}
         playbackRate={playbackRate}
         onReady={onReady}
         onError={onError}
@@ -103,7 +128,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           thirdPartyCookiesEnabled: true,
         }}
         initialPlayerParams={{
-          controls: 1,
+          controls: false,
           modestbranding: 1,
           rel: 0,
           playsinline: 1,

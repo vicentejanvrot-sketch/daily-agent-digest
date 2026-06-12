@@ -5,6 +5,7 @@ import {
   Animated,
   Linking,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import * as ScreenOrientation from "expo-screen-orientation";
+import { LinearGradient } from "expo-linear-gradient";
 import VideoPlayerContent from "@/components/VideoPlayerContent";
 import type { VideoPlayerHandle } from "@/components/VideoPlayerContent";
 import {
@@ -25,9 +27,14 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  FastForward,
   Heart,
+  Maximize,
   MessageCircle,
   MoreHorizontal,
+  Pause,
+  Play,
+  Rewind,
   Send,
   Settings,
   Share2,
@@ -38,6 +45,7 @@ import { Colors } from "@/constants/colors";
 import { useUpdateItemStatus } from "@/lib/hooks";
 import { useToast } from "@/components/Toast";
 import { openExternalLink } from "@/lib/open-link";
+import { useYouTubeConnection } from "@/lib/useYouTubeConnection";
 import {
   useVideoQuality,
   QUALITY_KEYS,
@@ -113,6 +121,7 @@ export default function VideoPlayerScreen() {
   const insets = useSafeAreaInsets();
   const updateStatus = useUpdateItemStatus();
   const showToast = useToast();
+  const youtubeConn = useYouTubeConnection();
 
   // Shared quality / speed prefs (synced with Settings screen)
   const { quality, setQuality, speed, setSpeed, ready: prefsReady } = useVideoQuality();
@@ -120,12 +129,13 @@ export default function VideoPlayerScreen() {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const rawId = videoId?.trim() || null;
   const videoIdStr = rawId ? normalizeVideoId(rawId) : null;
   const itemIdStr = itemId?.trim() ?? null;
 
-  // Auto-mark-as-watched guard + overlay (declared before the effect that uses them)
+  // Auto-mark-as-watched guard + overlay
   const autoWatchedRef = useRef(false);
   const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,6 +147,7 @@ export default function VideoPlayerScreen() {
     setLoadError(false);
     setReady(false);
     setIsFullscreen(false);
+    setIsPlaying(false);
     autoWatchedRef.current = false;
     if (overlayTimerRef.current) {
       clearTimeout(overlayTimerRef.current);
@@ -155,15 +166,62 @@ export default function VideoPlayerScreen() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
+  // ── Progress bar scrubbing state ─────────────────────────────
+
+  const progressBarWidth = useRef(0);
+  const durationRef = useRef(duration);
+  const seekFractionRef = useRef(0);
+  const playerRefForSeek = useRef<VideoPlayerHandle | null>(null);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekFraction, setSeekFraction] = useState(0);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
   // Native-only ref for injecting quality changes into the WebView
   const playerRef = useRef<VideoPlayerHandle | null>(null);
+
+  useEffect(() => {
+    playerRefForSeek.current = playerRef.current;
+  });
+
+  // ── PanResponder for the progress bar ────────────────────────
+
+  const clampLocation = useCallback((x: number) => {
+    const w = progressBarWidth.current;
+    if (w <= 0) return 0;
+    return Math.max(0, Math.min(1, x / w));
+  }, []);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => durationRef.current > 0,
+      onMoveShouldSetPanResponder: () => durationRef.current > 0,
+      onPanResponderGrant: (evt) => {
+        setIsSeeking(true);
+        const fraction = Math.max(0, Math.min(1, evt.nativeEvent.locationX / Math.max(1, progressBarWidth.current)));
+        seekFractionRef.current = fraction;
+        setSeekFraction(fraction);
+      },
+      onPanResponderMove: (evt) => {
+        const fraction = Math.max(0, Math.min(1, evt.nativeEvent.locationX / Math.max(1, progressBarWidth.current)));
+        seekFractionRef.current = fraction;
+        setSeekFraction(fraction);
+      },
+      onPanResponderRelease: () => {
+        const seekTime = seekFractionRef.current * durationRef.current;
+        playerRefForSeek.current?.seekTo(seekTime);
+        setIsSeeking(false);
+      },
+    }),
+  ).current;
 
   // ── Fullscreen management ────────────────────────────────────
 
   const enterFullscreen = useCallback(async () => {
     setIsFullscreen(true);
     if (Platform.OS !== "web") {
-      // Best-effort orientation lock — iPad ignores this when supportsTablet is true
       try {
         await ScreenOrientation.lockAsync(
           ScreenOrientation.OrientationLock.LANDSCAPE,
@@ -185,13 +243,11 @@ export default function VideoPlayerScreen() {
         // ignore — orientation lock may not be active
       }
     } else {
-      // Try the player's own exit first, then fall back to the browser API
       try {
         await playerRef.current?.exitFullscreen();
       } catch {
         // ignore
       }
-      // Safety net: if still in fullscreen, exit directly via the browser
       if (typeof document !== "undefined" && document.fullscreenElement) {
         try {
           if (document.exitFullscreen) {
@@ -207,18 +263,26 @@ export default function VideoPlayerScreen() {
     }
   }, []);
 
+  const toggleFullscreen = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isFullscreen) {
+      await exitFullscreen();
+    } else {
+      await enterFullscreen();
+    }
+  }, [isFullscreen, enterFullscreen, exitFullscreen]);
+
   const handleStateChange = useCallback(
     (event: string) => {
       if (event === "playing") {
-        // Cancel any pending error timer — player recovered
+        setIsPlaying(true);
         if (errorTimerRef.current) {
           clearTimeout(errorTimerRef.current);
           errorTimerRef.current = null;
         }
         setLoadError(false);
-        enterFullscreen();
       } else if (event === "paused" || event === "ended") {
-        exitFullscreen();
+        setIsPlaying(false);
       }
       // Auto-mark as watched when the video finishes naturally
       if (event === "ended" && itemIdStr && !autoWatchedRef.current) {
@@ -243,11 +307,11 @@ export default function VideoPlayerScreen() {
             }, 3000);
           })
           .catch(() => {
-            // Silently ignore — don't surface errors for auto-mark
+            // Silently ignore
           });
       }
     },
-    [enterFullscreen, exitFullscreen, itemIdStr, updateStatus, watchedOverlayOpacity],
+    [itemIdStr, updateStatus, watchedOverlayOpacity],
   );
 
   // Restore orientation / exit fullscreen on unmount
@@ -289,8 +353,7 @@ export default function VideoPlayerScreen() {
   const embeddedWidth = Math.min(windowWidth, PLAYER_MAX_WIDTH);
   const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
 
-  // Fullscreen player sizing — fill the actual screen; the YouTube embed
-  // letterboxes its 16:9 video inside, staying upright in any orientation.
+  // Fullscreen player sizing — fill the actual screen
   const fullscreenWidth = windowWidth;
   const fullscreenHeight = windowHeight;
 
@@ -322,6 +385,55 @@ export default function VideoPlayerScreen() {
   }, [videoIdStr, showToast]);
 
   const shareUrl = `https://www.youtube.com/watch?v=${videoIdStr}`;
+
+  // ── Transport controls ───────────────────────────────────────
+
+  const togglePlayPause = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isPlaying) {
+      await playerRef.current?.pause();
+    } else {
+      await playerRef.current?.play();
+    }
+  }, [isPlaying]);
+
+  const skipBack = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const target = Math.max(0, currentTime - 10);
+    setCurrentTime(target);
+    await playerRef.current?.seekTo(target);
+  }, [currentTime]);
+
+  const skipForward = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const target = Math.min(duration || Infinity, currentTime + 10);
+    setCurrentTime(target);
+    await playerRef.current?.seekTo(target);
+  }, [currentTime, duration]);
+
+  // ── YouTube sync actions ─────────────────────────────────────
+
+  const handleSaveToWatchLater = useCallback(async () => {
+    if (!videoIdStr || youtubeConn.status !== "connected") return;
+    void Haptics.selectionAsync();
+    try {
+      await youtubeConn.syncAction(videoIdStr, "watch_later");
+      showToast("Saved to Watch Later on YouTube", "success");
+    } catch {
+      showToast("Couldn't save to Watch Later", "error");
+    }
+  }, [videoIdStr, youtubeConn, showToast]);
+
+  const handleLikeOnYoutube = useCallback(async () => {
+    if (!videoIdStr || youtubeConn.status !== "connected") return;
+    void Haptics.selectionAsync();
+    try {
+      await youtubeConn.syncAction(videoIdStr, "rate");
+      showToast("Liked on YouTube", "success");
+    } catch {
+      showToast("Couldn't like on YouTube", "error");
+    }
+  }, [videoIdStr, youtubeConn, showToast]);
 
   // ── Share actions ────────────────────────────────────────────
 
@@ -385,7 +497,6 @@ export default function VideoPlayerScreen() {
     async (q: QualityKey) => {
       void Haptics.selectionAsync();
       await setQuality(q);
-      // Inject quality change into the YouTube player (native only)
       if (Platform.OS !== "web" && playerRef.current) {
         const ytQuality = QUALITY_YOUTUBE[q];
         playerRef.current.inject(
@@ -401,7 +512,6 @@ export default function VideoPlayerScreen() {
       void Haptics.selectionAsync();
       await setSpeed(s);
       const rate = Number(s);
-      // Inject speed change into the running YouTube player
       if (playerRef.current) {
         playerRef.current.inject(
           `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
@@ -431,6 +541,60 @@ export default function VideoPlayerScreen() {
   // ── playbackRate as a number ───────────────────────────────────
 
   const playbackRate = Number(speed);
+
+  // ── Progress fraction ──────────────────────────────────────────
+
+  const progressFraction =
+    duration > 0
+      ? isSeeking
+        ? seekFraction
+        : currentTime / duration
+      : 0;
+
+  // ── Speed pills fragment (reused in embedded + fullscreen) ─────
+
+  const speedPillsRow = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.speedPillsContainer}
+    >
+      {SPEED_KEYS.map((s) => {
+        const isActive = s === speed;
+        return (
+          <Pressable
+            key={s}
+            style={({ pressed }) => [
+              styles.speedPill,
+              isActive && styles.speedPillActive,
+              pressed && styles.speedPillPressed,
+            ]}
+            onPress={() => handleSpeedSelect(s)}
+          >
+            <Text
+              style={[
+                styles.speedPillText,
+                isActive && styles.speedPillTextActive,
+              ]}
+            >
+              {SPEED_PILL_LABELS[s]}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+
+  // ── Countdown pill fragment ────────────────────────────────────
+
+  const countdownPill = duration > 0 && (
+    <View style={styles.countdownPill}>
+      <Clock size={14} color={Colors.textMuted} />
+      <Text style={styles.countdownText}>
+        {formatTime(Math.max(0, duration - currentTime))} left
+      </Text>
+    </View>
+  );
 
   // ── Missing video_id ────────────────────────────────────────────
 
@@ -505,7 +669,7 @@ export default function VideoPlayerScreen() {
     );
   }
 
-  // ── Normal: embedded player ─────────────────────────────────────
+  // ── Normal: player with transport overlay ───────────────────────
 
   return (
     <View style={styles.root}>
@@ -529,7 +693,7 @@ export default function VideoPlayerScreen() {
             >
               <Share2 size={20} color={Colors.textSecondary} />
             </Pressable>
-            {/* Gear icon — opens quality/speed sheet */}
+            {/* Gear icon */}
             <Pressable
               onPress={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -542,51 +706,13 @@ export default function VideoPlayerScreen() {
             </Pressable>
           </View>
 
-          {/* Inline speed selector */}
-          <View style={styles.speedSelectorRow}>
-            <Text style={styles.speedLabel}>Speed</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.speedPillsContainer}
-            >
-              {SPEED_KEYS.map((s) => {
-                const isActive = s === speed;
-                return (
-                  <Pressable
-                    key={s}
-                    style={({ pressed }) => [
-                      styles.speedPill,
-                      isActive && styles.speedPillActive,
-                      pressed && styles.speedPillPressed,
-                    ]}
-                    onPress={() => handleSpeedSelect(s)}
-                  >
-                    <Text
-                      style={[
-                        styles.speedPillText,
-                        isActive && styles.speedPillTextActive,
-                      ]}
-                    >
-                      {SPEED_PILL_LABELS[s]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Countdown time-left pill */}
-          {duration > 0 && (
-            <View style={styles.countdownWrapper}>
-              <View style={styles.countdownPill}>
-                <Clock size={14} color={Colors.textMuted} />
-                <Text style={styles.countdownText}>
-                  {formatTime(Math.max(0, duration - currentTime))} left
-                </Text>
-              </View>
+          {/* Speed pills row (embedded) */}
+          <View style={styles.embeddedControlsRow}>
+            <View style={styles.speedPillsWrapper}>
+              {speedPillsRow}
             </View>
-          )}
+            {countdownPill}
+          </View>
 
           {/* Status actions */}
           <View style={styles.actionsRow}>
@@ -611,10 +737,61 @@ export default function VideoPlayerScreen() {
               );
             })}
           </View>
+
+          {/* YouTube sync actions (only when connected) */}
+          {youtubeConn.status === "connected" && (
+            <View style={styles.actionsRow}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  pressed && styles.actionBtnPressed,
+                ]}
+                onPress={handleSaveToWatchLater}
+              >
+                <Clock size={18} color={Colors.warning} />
+                <Text style={styles.actionLabel}>Save to YouTube</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  pressed && styles.actionBtnPressed,
+                ]}
+                onPress={handleLikeOnYoutube}
+              >
+                <Heart size={18} color={Colors.destructive} fill={Colors.destructive} />
+                <Text style={styles.actionLabel}>Like on YouTube</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  pressed && styles.actionBtnPressed,
+                ]}
+                onPress={handleOpenInYoutube}
+              >
+                <ExternalLink size={18} color={Colors.accent} />
+                <Text style={styles.actionLabel}>Open in YouTube</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {youtubeConn.status !== "connected" && (
+            <View style={styles.openYoutubeRow}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.openYoutubeInline,
+                  pressed && styles.pressed,
+                ]}
+                onPress={handleOpenInYoutube}
+              >
+                <ExternalLink size={16} color={Colors.accent} />
+                <Text style={styles.openYoutubeInlineText}>Open in YouTube</Text>
+              </Pressable>
+            </View>
+          )}
         </>
       )}
 
-      {/* Player */}
+      {/* ── Player container ─────────────────────────────────── */}
       <View
         style={
           isFullscreen ? styles.fullscreenPlayerWrapper : styles.playerWrapper
@@ -625,9 +802,9 @@ export default function VideoPlayerScreen() {
             <ActivityIndicator size="large" color={Colors.accent} />
           </View>
         )}
+
         {isFullscreen ? (
-          <>
-            <View
+          <View
             style={[
               styles.fullscreenPlayerInner,
               {
@@ -667,89 +844,139 @@ export default function VideoPlayerScreen() {
               }}
               onChangeState={handleStateChange}
             />
-          </View>
 
-          {/* Fullscreen controls overlay */}
-          {ready && (
-            <View style={styles.fullscreenControls} pointerEvents="box-none">
-              {/* Speed pills */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.fullscreenSpeedRow}
-                style={{ flexShrink: 1 }}
-              >
-                {SPEED_KEYS.map((s) => {
-                  const isActive = s === speed;
-                  return (
-                    <Pressable
-                      key={s}
-                      style={({ pressed }) => [
-                        styles.speedPill,
-                        styles.fullscreenSpeedPill,
-                        isActive && styles.speedPillActive,
-                        pressed && styles.speedPillPressed,
-                      ]}
-                      onPress={() => handleSpeedSelect(s)}
-                    >
-                      <Text
-                        style={[
-                          styles.speedPillText,
-                          isActive && styles.speedPillTextActive,
-                        ]}
-                      >
-                        {SPEED_PILL_LABELS[s]}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+            {/* Transport overlay (fullscreen) */}
+            {ready && (
+              <View style={styles.transportOverlay} pointerEvents="box-none">
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.7)"]}
+                  style={styles.transportGradient}
+                />
+                <View style={styles.transportRow}>
+                  <Pressable
+                    onPress={skipBack}
+                    style={({ pressed }) => [
+                      styles.transportBtn,
+                      pressed && styles.transportBtnPressed,
+                    ]}
+                    hitSlop={8}
+                  >
+                    <Rewind size={28} color={Colors.white} />
+                  </Pressable>
 
-              {/* Countdown pill */}
-              {duration > 0 && (
-                <View style={styles.fullscreenCountdown}>
-                  <View style={styles.countdownPill}>
-                    <Clock size={14} color={Colors.textMuted} />
-                    <Text style={styles.countdownText}>
-                      {formatTime(Math.max(0, duration - currentTime))} left
-                    </Text>
-                  </View>
+                  <Pressable
+                    onPress={togglePlayPause}
+                    style={({ pressed }) => [
+                      styles.transportBtn,
+                      styles.transportBtnPlay,
+                      pressed && styles.transportBtnPressed,
+                    ]}
+                    hitSlop={8}
+                  >
+                    {isPlaying ? (
+                      <Pause size={30} color={Colors.white} />
+                    ) : (
+                      <Play size={30} color={Colors.white} />
+                    )}
+                  </Pressable>
+
+                  <Pressable
+                    onPress={skipForward}
+                    style={({ pressed }) => [
+                      styles.transportBtn,
+                      pressed && styles.transportBtnPressed,
+                    ]}
+                    hitSlop={8}
+                  >
+                    <FastForward size={28} color={Colors.white} />
+                  </Pressable>
                 </View>
-              )}
-            </View>
-          )}
-          </>
+              </View>
+            )}
+          </View>
         ) : (
-          <VideoPlayerContent
-            ref={playerRef}
-            videoId={videoIdStr}
-            height={embeddedHeight}
-            playbackRate={playbackRate}
-            onReady={() => {
-              setReady(true);
-              if (errorTimerRef.current) {
-                clearTimeout(errorTimerRef.current);
-                errorTimerRef.current = null;
-              }
-              setLoadError(false);
-              const rate = Number(speed);
-              if (rate !== 1 && playerRef.current) {
-                playerRef.current.inject(
-                  `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
-                );
-              }
-            }}
-            onError={() => {
-              if (errorTimerRef.current) {
-                clearTimeout(errorTimerRef.current);
-              }
-              errorTimerRef.current = setTimeout(() => {
-                errorTimerRef.current = null;
-                setLoadError(true);
-              }, 4000);
-            }}
-            onChangeState={handleStateChange}
-          />
+          <View>
+            <VideoPlayerContent
+              ref={playerRef}
+              videoId={videoIdStr}
+              width={embeddedWidth}
+              height={embeddedHeight}
+              playbackRate={playbackRate}
+              onReady={() => {
+                setReady(true);
+                if (errorTimerRef.current) {
+                  clearTimeout(errorTimerRef.current);
+                  errorTimerRef.current = null;
+                }
+                setLoadError(false);
+                const rate = Number(speed);
+                if (rate !== 1 && playerRef.current) {
+                  playerRef.current.inject(
+                    `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
+                  );
+                }
+              }}
+              onError={() => {
+                if (errorTimerRef.current) {
+                  clearTimeout(errorTimerRef.current);
+                }
+                errorTimerRef.current = setTimeout(() => {
+                  errorTimerRef.current = null;
+                  setLoadError(true);
+                }, 4000);
+              }}
+              onChangeState={handleStateChange}
+            />
+
+            {/* Transport overlay (embedded) */}
+            {ready && (
+              <View style={styles.transportOverlay} pointerEvents="box-none">
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.7)"]}
+                  style={styles.transportGradient}
+                />
+                <View style={styles.transportRow}>
+                  <Pressable
+                    onPress={skipBack}
+                    style={({ pressed }) => [
+                      styles.transportBtn,
+                      pressed && styles.transportBtnPressed,
+                    ]}
+                    hitSlop={8}
+                  >
+                    <Rewind size={26} color={Colors.white} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={togglePlayPause}
+                    style={({ pressed }) => [
+                      styles.transportBtn,
+                      styles.transportBtnPlay,
+                      pressed && styles.transportBtnPressed,
+                    ]}
+                    hitSlop={8}
+                  >
+                    {isPlaying ? (
+                      <Pause size={28} color={Colors.white} />
+                    ) : (
+                      <Play size={28} color={Colors.white} />
+                    )}
+                  </Pressable>
+
+                  <Pressable
+                    onPress={skipForward}
+                    style={({ pressed }) => [
+                      styles.transportBtn,
+                      pressed && styles.transportBtnPressed,
+                    ]}
+                    hitSlop={8}
+                  >
+                    <FastForward size={26} color={Colors.white} />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
         )}
 
         {/* Fullscreen close button */}
@@ -770,6 +997,77 @@ export default function VideoPlayerScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* ── Progress / scrubber row ──────────────────────────── */}
+      {ready && (
+        <View
+          style={[
+            styles.progressRow,
+            isFullscreen && styles.progressRowFullscreen,
+          ]}
+        >
+          <Text style={styles.progressTimeText}>
+            {formatTime(isSeeking ? seekFraction * duration : currentTime)}
+          </Text>
+
+          {/* Progress bar */}
+          <View
+            style={styles.progressBar}
+            onLayout={(e) => {
+              progressBarWidth.current = e.nativeEvent.layout.width;
+            }}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.progressBarTrack}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${Math.min(100, progressFraction * 100)}%` },
+                ]}
+              />
+              <View
+                style={[
+                  styles.progressBarHandle,
+                  {
+                    left: `${Math.min(100, progressFraction * 100)}%`,
+                    opacity: isSeeking ? 1 : 0.6,
+                    transform: [
+                      { translateX: -6 },
+                      { scale: isSeeking ? 1.3 : 1 },
+                    ],
+                  },
+                ]}
+              />
+            </View>
+          </View>
+
+          <Text style={styles.progressTimeText}>
+            {formatTime(duration)}
+          </Text>
+
+          {/* Fullscreen toggle */}
+          <Pressable
+            onPress={toggleFullscreen}
+            style={({ pressed }) => [
+              styles.fullscreenToggleBtn,
+              pressed && styles.fullscreenToggleBtnPressed,
+            ]}
+            hitSlop={8}
+          >
+            <Maximize size={18} color={Colors.textSecondary} />
+          </Pressable>
+        </View>
+      )}
+
+      {/* ── Fullscreen speed + countdown overlay ─────────────── */}
+      {isFullscreen && ready && (
+        <View style={styles.fullscreenControls} pointerEvents="box-none">
+          <View style={{ flexShrink: 1 }}>
+            {speedPillsRow}
+          </View>
+          {countdownPill}
+        </View>
+      )}
 
       {/* ── Share modal ───────────────────────────────────── */}
       <Modal
@@ -891,15 +1189,12 @@ export default function VideoPlayerScreen() {
         onRequestClose={() => setGearOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setGearOpen(false)}>
-          {/* Pressable that absorbs taps on the backdrop */}
           <View />
         </Pressable>
 
-        {/* Bottom sheet — scrollable so nothing is clipped */}
         <View
           style={[styles.gearSheet, { paddingBottom: insets.bottom + 16 }]}
         >
-          {/* Drag handle */}
           <View style={styles.handleBar} />
 
           <ScrollView
@@ -1042,12 +1337,15 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
     fontSize: 15,
   },
+
+  // ── Player wrappers ─────────────────────────────────────────
   playerWrapper: {
     width: "100%",
     maxWidth: PLAYER_MAX_WIDTH,
     alignSelf: "center",
     backgroundColor: Colors.black,
     overflow: "hidden",
+    borderRadius: 10,
   },
   fullscreenPlayerWrapper: {
     ...StyleSheet.absoluteFillObject,
@@ -1070,34 +1368,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 110,
   },
-
-  // ── Fullscreen overlay controls ────────────────────────────
-  fullscreenControls: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: 24,
-    paddingHorizontal: 16,
-    zIndex: 105,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  fullscreenSpeedRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingVertical: 4,
-  },
-  fullscreenSpeedPill: {
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderColor: "rgba(255,255,255,0.25)",
-  },
-  fullscreenCountdown: {
-    alignItems: "flex-end",
-    flexShrink: 0,
-  },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
@@ -1106,24 +1376,129 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
-  // ── Inline speed selector ──────────────────────────────────
-  speedSelectorRow: {
+  // ── Transport overlay (over the video) ──────────────────────
+  transportOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "flex-end",
+    zIndex: 5,
+  },
+  transportGradient: {
+    ...StyleSheet.absoluteFillObject,
+    height: 120,
+    top: undefined,
+  },
+  transportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 24,
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+  },
+  transportBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  transportBtnPlay: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  transportBtnPressed: {
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+
+  // ── Progress / scrubber row ─────────────────────────────────
+  progressRow: {
     width: "100%",
     maxWidth: PLAYER_MAX_WIDTH,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
   },
-  speedLabel: {
-    fontSize: 13,
-    fontWeight: "500" as const,
+  progressRowFullscreen: {
+    position: "absolute",
+    bottom: 60,
+    left: 0,
+    right: 0,
+    maxWidth: "100%",
+    zIndex: 108,
+    paddingHorizontal: 20,
+  },
+  progressTimeText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
     color: Colors.textMuted,
-    minWidth: 42,
+    fontVariant: ["tabular-nums"] as const,
+    minWidth: 40,
+    textAlign: "center",
   },
+  progressBar: {
+    flex: 1,
+    height: 32,
+    justifyContent: "center",
+  },
+  progressBarTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    overflow: "visible",
+  },
+  progressBarFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.accent,
+  },
+  progressBarHandle: {
+    position: "absolute",
+    top: -4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.white,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  fullscreenToggleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 2,
+  },
+  fullscreenToggleBtnPressed: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  // ── Embedded controls row ───────────────────────────────────
+  embeddedControlsRow: {
+    width: "100%",
+    maxWidth: PLAYER_MAX_WIDTH,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  speedPillsWrapper: {
+    flexShrink: 1,
+  },
+
+  // ── Speed pills ─────────────────────────────────────────────
   speedPillsContainer: {
     flexDirection: "row",
     gap: 8,
@@ -1152,15 +1527,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
-  // ── Countdown pill ─────────────────────────────────────────
-  countdownWrapper: {
-    width: "100%",
-    maxWidth: PLAYER_MAX_WIDTH,
-    alignSelf: "center",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 6,
-  },
+  // ── Countdown pill ──────────────────────────────────────────
   countdownPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1176,13 +1543,29 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"] as const,
   },
 
+  // ── Fullscreen controls overlay ─────────────────────────────
+  fullscreenControls: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: 24,
+    paddingHorizontal: 16,
+    zIndex: 105,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  // ── Status actions ──────────────────────────────────────────
   actionsRow: {
     width: "100%",
     maxWidth: PLAYER_MAX_WIDTH,
     alignSelf: "center",
     flexDirection: "row",
     justifyContent: "space-evenly",
-    paddingVertical: 16,
+    paddingVertical: 8,
     paddingHorizontal: 16,
   },
   actionBtn: {
@@ -1202,6 +1585,28 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+
+  // ── Open in YouTube row (when not connected) ────────────────
+  openYoutubeRow: {
+    width: "100%",
+    maxWidth: PLAYER_MAX_WIDTH,
+    alignSelf: "center",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  openYoutubeInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  openYoutubeInlineText: {
+    fontSize: 13,
+    color: Colors.accent,
+    fontWeight: "500" as const,
   },
 
   // ── Gear modal ──────────────────────────────────────────────

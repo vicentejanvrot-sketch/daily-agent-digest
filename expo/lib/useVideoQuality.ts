@@ -61,7 +61,7 @@ const SPEED_KEY = "@settings/video_speed";
  */
 export function useVideoQuality() {
   const [quality, setQualityState] = useState<QualityKey>("Auto");
-  const [speed, setSpeedState] = useState<SpeedKey>("1");
+  const [speed, setSpeedState] = useState<SpeedKey>("2");
   const [ready, setReady] = useState(false);
 
   // Load persisted prefs on mount

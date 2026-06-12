@@ -6,6 +6,12 @@ export interface VideoPlayerHandle {
   getDuration: () => Promise<number>;
   requestFullscreen: () => Promise<void>;
   exitFullscreen: () => Promise<void>;
+  /** Start or resume playback. */
+  play: () => Promise<void>;
+  /** Pause playback. */
+  pause: () => Promise<void>;
+  /** Seek to a specific time in seconds. */
+  seekTo: (seconds: number) => Promise<void>;
 }
 
 interface VideoPlayerContentProps {

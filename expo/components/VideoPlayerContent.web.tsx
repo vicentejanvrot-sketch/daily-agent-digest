@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useEffect, useRef } from "react";
+import React, { forwardRef, useImperativeHandle, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, Platform } from "react-native";
 
 // ── Public ref API (mirrors the native variant) ────────────────────
@@ -13,6 +13,12 @@ export interface VideoPlayerHandle {
   requestFullscreen: () => Promise<void>;
   /** Exit fullscreen if currently active. */
   exitFullscreen: () => Promise<void>;
+  /** Start or resume playback. */
+  play: () => Promise<void>;
+  /** Pause playback. */
+  pause: () => Promise<void>;
+  /** Seek to a specific time in seconds. */
+  seekTo: (seconds: number) => Promise<void>;
 }
 
 interface VideoPlayerContentProps {
@@ -40,13 +46,24 @@ const PLAYER_STATE_MAP: Record<number, string> = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Iframe = "iframe" as any;
 
+/** Post a command to the YouTube IFrame API player. */
+function postToPlayer(iframe: HTMLIFrameElement | null, command: string, args?: unknown) {
+  if (!iframe?.contentWindow) return;
+  const msg = JSON.stringify({
+    event: "command",
+    func: command,
+    args: args !== undefined ? [args] : [],
+  });
+  iframe.contentWindow.postMessage(msg, "*");
+}
+
 /**
  * Renders a YouTube embed via a plain HTML iframe on web.
- * Accepts playbackRate for API consistency but the plain iframe
- * cannot programmatically control quality or speed.
  *
  * Uses the YouTube IFrame API (enablejsapi=1) and listens for
  * postMessage events to detect playback state changes.
+ * YouTube's native chrome is hidden (`controls=0`) so the parent
+ * can render its own custom transport overlay and progress bar.
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
@@ -54,6 +71,18 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     ref,
   ) {
     const iframeElRef = useRef<HTMLIFrameElement | null>(null);
+
+    const play = useCallback(async () => {
+      postToPlayer(iframeElRef.current, "playVideo");
+    }, []);
+
+    const pause = useCallback(async () => {
+      postToPlayer(iframeElRef.current, "pauseVideo");
+    }, []);
+
+    const seekTo = useCallback(async (seconds: number) => {
+      postToPlayer(iframeElRef.current, "seekTo", seconds);
+    }, []);
 
     // ── Forwarded ref API ─────────────────────────────────
     useImperativeHandle(ref, () => ({
@@ -98,7 +127,10 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           // ignore
         }
       },
-    }));
+      play,
+      pause,
+      seekTo,
+    }), [play, pause, seekTo]);
 
     // ── Listen for YouTube IFrame API postMessage events ────
     useEffect(() => {
@@ -133,7 +165,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
 
     const embedUrl =
       `https://www.youtube.com/embed/${videoId}` +
-      `?playsinline=1&controls=1&modestbranding=1&rel=0&enablejsapi=1`;
+      `?playsinline=1&controls=0&modestbranding=1&rel=0&enablejsapi=1`;
 
     return (
       <View style={[styles.wrapper, { height }]}>
