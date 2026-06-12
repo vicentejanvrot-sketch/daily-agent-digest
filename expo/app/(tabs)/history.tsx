@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 14, color: Colors.textSecondary },
 
   // List
-  list: { padding: 16, paddingBottom: 40, maxWidth: 720, width: "100%", alignSelf: "center" },
+  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, maxWidth: 720, width: "100%", alignSelf: "center" },
   listEmpty: { flex: 1, justifyContent: "center" },
 
   // Empty
