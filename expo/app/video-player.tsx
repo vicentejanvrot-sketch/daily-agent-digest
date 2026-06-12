@@ -354,21 +354,16 @@ export default function VideoPlayerScreen() {
   const embeddedWidth = windowWidth - EMBED_H_MARGIN * 2;
   const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
 
-  // Fullscreen player sizing — fit the largest 16:9 box inside the screen.
-  // On landscape tablets this sizes height-limited so letterboxing is on
-  // top/bottom, not dead space on the sides.
-  const TARGET_RATIO = 16 / 9;
-  const screenRatio = windowWidth / windowHeight;
-  let fullscreenWidth: number;
-  let fullscreenHeight: number;
-  if (screenRatio > TARGET_RATIO) {
-    // Screen is wider than 16:9 → height-limited → bars on top/bottom
-    fullscreenHeight = windowHeight;
-    fullscreenWidth = Math.round(windowHeight * TARGET_RATIO);
-  } else {
-    // Screen is narrower than 16:9 (or equal) → width-limited → bars on sides
-    fullscreenWidth = windowWidth;
-    fullscreenHeight = Math.round(windowWidth / TARGET_RATIO);
+  // Fullscreen player sizing — always fill the long edge edge-to-edge
+  // with 16:9 letterboxing on top/bottom, never left/right dead space.
+  const longEdge = Math.max(windowWidth, windowHeight);
+  const shortEdge = Math.min(windowWidth, windowHeight);
+  let fullscreenWidth = longEdge;
+  let fullscreenHeight = Math.round(longEdge * 9 / 16);
+  // Safety cap: if computed height exceeds the short edge, clamp width
+  if (fullscreenHeight > shortEdge) {
+    fullscreenHeight = shortEdge;
+    fullscreenWidth = Math.round(shortEdge * 16 / 9);
   }
 
   const handleClose = useCallback(() => {
