@@ -221,15 +221,7 @@ export default function VideoPlayerScreen() {
 
   const enterFullscreen = useCallback(async () => {
     setIsFullscreen(true);
-    if (Platform.OS !== "web") {
-      try {
-        await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.LANDSCAPE,
-        );
-      } catch {
-        // iPad rejects the lock — the fullscreen overlay still shows correctly
-      }
-    } else {
+    if (Platform.OS === "web") {
       await playerRef.current?.requestFullscreen();
     }
   }, []);
@@ -354,16 +346,14 @@ export default function VideoPlayerScreen() {
   const embeddedWidth = Math.min(windowWidth - EMBED_H_MARGIN * 2, PLAYER_MAX_WIDTH);
   const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
 
-  // Fullscreen player sizing — always fill the long edge edge-to-edge
-  // with 16:9 letterboxing on top/bottom, never left/right dead space.
-  const longEdge = Math.max(windowWidth, windowHeight);
-  const shortEdge = Math.min(windowWidth, windowHeight);
-  let fullscreenWidth = longEdge;
-  let fullscreenHeight = Math.round(longEdge * 9 / 16);
-  // Safety cap: if computed height exceeds the short edge, clamp width
-  if (fullscreenHeight > shortEdge) {
-    fullscreenHeight = shortEdge;
-    fullscreenWidth = Math.round(shortEdge * 16 / 9);
+  // Fullscreen player sizing — 16:9 letterbox from live window dimensions.
+  // Recomputes on rotation so flipping the device re-fits the video.
+  let fullscreenWidth = windowWidth;
+  let fullscreenHeight = Math.round(windowWidth * 9 / 16);
+  // Safety cap: if computed height exceeds the available screen height, clamp
+  if (fullscreenHeight > windowHeight) {
+    fullscreenHeight = windowHeight;
+    fullscreenWidth = Math.round(windowHeight * 16 / 9);
   }
 
   const handleClose = useCallback(() => {
