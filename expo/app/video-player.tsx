@@ -351,7 +351,7 @@ export default function VideoPlayerScreen() {
 
   // Embedded (non-fullscreen) player sizing — 16:9, full-width on tablet/desktop
   const EMBED_H_MARGIN = windowWidth >= 700 ? 24 : 0;
-  const embeddedWidth = windowWidth - EMBED_H_MARGIN * 2;
+  const embeddedWidth = Math.min(windowWidth - EMBED_H_MARGIN * 2, PLAYER_MAX_WIDTH);
   const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
 
   // Fullscreen player sizing — always fill the long edge edge-to-edge
@@ -802,9 +802,10 @@ export default function VideoPlayerScreen() {
 
       {/* ── Player container ─────────────────────────────────── */}
       <View
-        style={
-          isFullscreen ? styles.fullscreenPlayerWrapper : styles.playerWrapper
-        }
+        style={[
+          isFullscreen ? styles.fullscreenPlayerWrapper : styles.playerWrapper,
+          !isFullscreen && { width: embeddedWidth },
+        ]}
       >
         {!ready && !isFullscreen && (
           <View style={styles.loadingOverlay}>
@@ -1365,6 +1366,7 @@ const styles = StyleSheet.create({
   fullscreenPlayerWrapper: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.black,
+    overflow: "hidden",
     zIndex: 100,
     justifyContent: "center",
     alignItems: "center",
