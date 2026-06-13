@@ -118,11 +118,13 @@ export function useWatchTimeStats(period: TimePeriod = "all") {
       // ── Fetch items ──────────────────────────────────────────
       let itemsQuery = supabase
         .from("items")
-        .select("id, agent_id, channel_id, channel_name, user_status, created_at")
+        .select("id, agent_id, channel_id, channel_name, user_status, created_at, published_at")
         .order("created_at", { ascending: false });
 
       if (startDate) {
-        itemsQuery = itemsQuery.gte("created_at", startDate);
+        itemsQuery = itemsQuery.or(
+          `published_at.gte.${startDate},and(published_at.is.null,created_at.gte.${startDate})`,
+        );
       }
 
       const { data: items, error: itemsError } = await itemsQuery;
@@ -135,6 +137,7 @@ export function useWatchTimeStats(period: TimePeriod = "all") {
         channel_name: string | null;
         user_status: string | null;
         created_at: string;
+        published_at: string | null;
       }>;
 
       if (itemRows.length === 0) {
@@ -145,7 +148,7 @@ export function useWatchTimeStats(period: TimePeriod = "all") {
       if (period === "all") {
         let earliestMs = Infinity;
         for (const r of itemRows) {
-          const t = new Date(r.created_at).getTime();
+          const t = new Date(r.published_at ?? r.created_at).getTime();
           if (t < earliestMs) earliestMs = t;
         }
         if (earliestMs !== Infinity) {
@@ -249,6 +252,7 @@ export function useWatchTimeStats(period: TimePeriod = "all") {
       for (const item of itemRows) {
         const duration = durationMap.get(item.id) ?? 0;
         const watched = isWatched(item.user_status);
+        const itemDate = new Date(item.published_at ?? item.created_at);
         const created = new Date(item.created_at);
         const agentId = item.agent_id;
         const channelId = item.channel_id ?? "unknown";
@@ -264,7 +268,7 @@ export function useWatchTimeStats(period: TimePeriod = "all") {
 
         // Daily trend
         if (startDate) {
-          const dayKey = format(created, "yyyy-MM-dd");
+          const dayKey = format(itemDate, "yyyy-MM-dd");
           const bucket = dailyMap.get(dayKey);
           if (bucket) {
             if (watched) {
