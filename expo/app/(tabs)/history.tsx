@@ -13,10 +13,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import {
-  CheckCircle,
   X,
   Ban,
-  Clock,
   XCircle,
   History,
   ChevronDown,
@@ -36,24 +34,8 @@ import {
   qk,
 } from "@/lib/hooks";
 import { useToast } from "@/components/Toast";
+import { StatusPill } from "@/components/StatusPill";
 import { timeAgo } from "@/lib/format";
-
-// ── Status badge config ───────────────────────────────────────────
-
-interface StatusBadgeConfig {
-  icon: typeof CheckCircle;
-  label: string;
-  color: string;
-  bg: string;
-}
-
-const STATUS_BADGE: Record<RunStatus, StatusBadgeConfig> = {
-  success: { icon: CheckCircle, label: "Success", color: Colors.success, bg: "rgba(34, 197, 94, 0.18)" },
-  partial: { icon: CheckCircle, label: "Partial", color: Colors.success, bg: "rgba(34, 197, 94, 0.18)" },
-  running: { icon: Clock, label: "Running", color: Colors.accent, bg: "rgba(14, 165, 233, 0.18)" },
-  failed: { icon: XCircle, label: "Failed", color: Colors.destructive, bg: Colors.destructiveBg },
-  cancelled: { icon: Ban, label: "Cancelled", color: Colors.textMuted, bg: "rgba(96, 105, 119, 0.18)" },
-};
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -226,8 +208,6 @@ export default function HistoryScreen() {
             </View>
           }
           renderItem={({ item }) => {
-            const cfg = STATUS_BADGE[item.status] ?? STATUS_BADGE.cancelled;
-            const StatusIcon = cfg.icon;
             const agent = agentMap.get(item.agent_id);
             const isRunning = item.status === "running";
             const isCancelling = cancelRun.isPending && cancelRun.variables === item.id;
@@ -267,12 +247,7 @@ export default function HistoryScreen() {
                     </Text>
                   </Pressable>
 
-                  <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-                    <StatusIcon size={13} color={cfg.color} />
-                    <Text style={[styles.badgeLabel, { color: cfg.color }]}>
-                      {cfg.label}
-                    </Text>
-                  </View>
+                  <StatusPill status={item.status} />
                 </View>
 
                 {/* Date */}
@@ -510,17 +485,6 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     color: Colors.textPrimary,
   },
-
-  // Status badge
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  badgeLabel: { fontSize: 12, fontWeight: "600" as const },
 
   // Timestamp
   timestamp: { fontSize: 12, color: Colors.textSecondary, marginTop: 6 },
