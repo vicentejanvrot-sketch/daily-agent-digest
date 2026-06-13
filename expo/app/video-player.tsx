@@ -746,14 +746,6 @@ export default function VideoPlayerScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Full-screen tap overlay — reveals controls when hidden */}
-      {controlsHidden && (
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={resetControlsTimer}
-        />
-      )}
-
       {/* Chrome: hidden in fullscreen */}
       {!isFullscreen && (
         <>
@@ -1187,6 +1179,15 @@ export default function VideoPlayerScreen() {
         </Animated.View>
       )}
 
+      {/* Tap overlay — reveals controls when hidden. Rendered at root level
+          with high zIndex so it sits above ALL other content elements. */}
+      {controlsHidden && (
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.tapOverlay]}
+          onPress={resetControlsTimer}
+        />
+      )}
+
       {/* ── Share modal ───────────────────────────────────── */}
       <Modal
         visible={shareOpen}
@@ -1390,6 +1391,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  tapOverlay: {
+    zIndex: 9999,
   },
   header: {
     flexDirection: "row",
