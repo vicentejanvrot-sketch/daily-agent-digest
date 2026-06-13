@@ -62,7 +62,11 @@ function postToPlayer(iframe: HTMLIFrameElement | null, command: string, args?: 
   const msg = JSON.stringify({
     event: "command",
     func: command,
-    args: args !== undefined ? [args] : [],
+    // YouTube expects args wrapped in an array for functions with arguments
+    // (e.g. setVolume → args: [50]) and an empty string for no-arg functions
+    // (e.g. mute → args: ""). Sending args: [] causes YouTube to silently
+    // ignore no-arg commands like mute/unmute.
+    args: args !== undefined ? [args] : "",
   });
   iframe.contentWindow.postMessage(msg, "*");
 }

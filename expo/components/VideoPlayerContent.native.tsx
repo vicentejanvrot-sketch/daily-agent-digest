@@ -46,6 +46,10 @@ const INJECTED_JS = `
         window.player.setPlaybackRate(d.meta.playbackRate);
       }else if(d.eventName==='setVolume'&&window.player){
         window.player.setVolume(d.meta.volume);
+      }else if(d.eventName==='muteVideo'&&window.player){
+        window.player.mute();
+      }else if(d.eventName==='unMuteVideo'&&window.player){
+        window.player.unMute();
       }
     }catch(_){}
   });
