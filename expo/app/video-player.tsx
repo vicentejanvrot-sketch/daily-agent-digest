@@ -813,12 +813,6 @@ export default function VideoPlayerScreen() {
     );
   }
 
-  // Block the YouTube iframe / WebView from intercepting taps while
-  // embedded so the custom transport controls reliably receive touches.
-  // On web the iframe steals pointer events regardless of z-index;
-  // on native the WKWebView/WebView renders above all RN views.
-  const shouldBlockIframe = !isFullscreen;
-
   // ── Normal: player with transport overlay ───────────────────────
 
   return (
@@ -961,60 +955,22 @@ export default function VideoPlayerScreen() {
           </View>
         )}
 
-        {isFullscreen ? (
-          <View
-            style={[
-              styles.fullscreenPlayerInner,
-              {
-                width: fullscreenWidth,
-                height: fullscreenHeight,
-              },
-            ]}
-          >
-            <VideoPlayerContent
-              ref={playerRef}
-              videoId={videoIdStr}
-              width={fullscreenWidth}
-              height={fullscreenHeight}
-              playbackRate={playbackRate}
-              blockIframeTouches={false}
-              onReady={() => {
-                setReady(true);
-                if (errorTimerRef.current) {
-                  clearTimeout(errorTimerRef.current);
-                  errorTimerRef.current = null;
-                }
-                setLoadError(false);
-                const rate = Number(speed);
-                if (rate !== 1 && playerRef.current) {
-                  playerRef.current.inject(
-                    `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
-                  );
-                }
-              }}
-              onError={() => {
-                if (errorTimerRef.current) {
-                  clearTimeout(errorTimerRef.current);
-                }
-                errorTimerRef.current = setTimeout(() => {
-                  errorTimerRef.current = null;
-                  setLoadError(true);
-                }, 4000);
-              }}
-              onChangeState={handleStateChange}
-              onProgress={handleProgress}
-            />
-
-
-          </View>
-        ) : (
+        {/* Single persistent player — never unmounts when toggling fullscreen.
+             Only the container style and dimensions change, so playback is preserved. */}
+        <View
+          style={
+            isFullscreen
+              ? [styles.fullscreenPlayerInner, { width: fullscreenWidth, height: fullscreenHeight }]
+              : {}
+          }
+        >
           <VideoPlayerContent
             ref={playerRef}
             videoId={videoIdStr}
-            width={embeddedWidth}
-            height={embeddedHeight}
+            width={isFullscreen ? fullscreenWidth : embeddedWidth}
+            height={isFullscreen ? fullscreenHeight : embeddedHeight}
             playbackRate={playbackRate}
-            blockIframeTouches={shouldBlockIframe}
+            blockIframeTouches={!isFullscreen}
             onReady={() => {
               setReady(true);
               if (errorTimerRef.current) {
@@ -1041,7 +997,7 @@ export default function VideoPlayerScreen() {
             onChangeState={handleStateChange}
             onProgress={handleProgress}
           />
-        )}
+        </View>
 
       </View>
 
