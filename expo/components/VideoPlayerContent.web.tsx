@@ -77,6 +77,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const playerReadyRef = useRef(false);
     /** Commands queued before the player signalled ready. Flushed when onReady fires. */
     const pendingCommandsRef = useRef<Array<() => void>>([]);
+    /** Tracks whether the iframe DOM has fired its load event. */
+    const iframeLoadedRef = useRef(false);
 
     /** Post a command now if the player is ready, otherwise queue it. */
     const sendCommand = useCallback((command: string, args?: unknown) => {
@@ -99,6 +101,39 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const seekTo = useCallback(async (seconds: number) => {
       sendCommand("seekTo", seconds);
     }, [sendCommand]);
+
+    // ── YouTube IFrame API listening handshake ────────────
+    /** Posts the handshake that tells YouTube the host is ready to receive API events. */
+    const sendListeningHandshake = useCallback(() => {
+      const iframe = iframeElRef.current;
+      if (!iframe?.contentWindow) return;
+      const msg = JSON.stringify({
+        event: "listening",
+        id: "1",
+        channel: "widget",
+      });
+      iframe.contentWindow.postMessage(msg, "*");
+    }, []);
+
+    /** Called when the iframe DOM finishes loading. Sends the listening handshake
+     *  and retries every 500 ms until YouTube responds with onReady. */
+    const handleIframeLoad = useCallback(() => {
+      iframeLoadedRef.current = true;
+      sendListeningHandshake();
+
+      const interval = setInterval(() => {
+        if (playerReadyRef.current) {
+          clearInterval(interval);
+          return;
+        }
+        sendListeningHandshake();
+      }, 500);
+
+      // Safety: stop retrying after 10 seconds even if onReady never arrives
+      setTimeout(() => clearInterval(interval), 10_000);
+
+      onReady?.();
+    }, [sendListeningHandshake, onReady]);
 
     // ── Forwarded ref API ─────────────────────────────────
     useImperativeHandle(ref, () => ({
@@ -218,7 +253,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           style={iframeStyle}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
           allowFullScreen
-          onLoad={onReady}
+          onLoad={handleIframeLoad}
           onError={onError}
         />
       </View>
