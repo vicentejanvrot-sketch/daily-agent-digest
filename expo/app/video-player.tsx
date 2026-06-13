@@ -1194,7 +1194,11 @@ export default function VideoPlayerScreen() {
         <Animated.View
           style={[
             styles.fullscreenBottomBar,
-            { paddingBottom: insets.bottom + 16 },
+            {
+              paddingBottom: insets.bottom + 16,
+              paddingLeft: Math.max(20, insets.left),
+              paddingRight: Math.max(20, insets.right),
+            },
             { opacity: controlsOpacity },
           ]}
           pointerEvents="box-none"
@@ -1205,7 +1209,7 @@ export default function VideoPlayerScreen() {
             pointerEvents="none"
           />
           {/* Progress / scrubber row (fullscreen) */}
-          <View style={styles.fullscreenProgressRow}>
+          <View style={[styles.fullscreenProgressRow, { paddingHorizontal: 0 }]}>
             <Text style={styles.progressTimeText}>
               {formatTime(isSeeking ? seekFraction * duration : currentTime)}
             </Text>
@@ -1254,7 +1258,7 @@ export default function VideoPlayerScreen() {
           </View>
 
           {/* Transport row */}
-          <View style={styles.fullscreenTransportRow}>
+          <View style={[styles.fullscreenTransportRow, { paddingHorizontal: 0 }]}>
             <Pressable
               onPress={skipBack}
               style={({ pressed }) => [
@@ -1294,7 +1298,7 @@ export default function VideoPlayerScreen() {
             </Pressable>
           </View>
           {/* Volume control (fullscreen) */}
-          <View style={styles.fullscreenVolumeRow}>
+          <View style={[styles.fullscreenVolumeRow, { paddingHorizontal: 0 }]}>
             <Pressable
               onPress={handleToggleMute}
               style={({ pressed }) => [
@@ -1341,7 +1345,7 @@ export default function VideoPlayerScreen() {
             )}
           </View>
           {/* Speed pills */}
-          <View style={[styles.fullscreenControlsRow, styles.fullscreenControlsRowTop]}>
+          <View style={[styles.fullscreenControlsRow, styles.fullscreenControlsRowTop, { paddingHorizontal: 0 }]}>
             <View style={{ alignItems: "center" as const }}>
               {speedPillsRow}
             </View>
@@ -1360,7 +1364,7 @@ export default function VideoPlayerScreen() {
         <Animated.View
           style={[
             styles.fullscreenCloseBtnRoot,
-            { top: insets.top + 8, opacity: controlsOpacity },
+            { top: insets.top + 8, right: Math.max(12, insets.right) + 12, opacity: controlsOpacity },
           ]}
         >
           <Pressable
