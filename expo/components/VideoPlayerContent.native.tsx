@@ -31,28 +31,80 @@ export interface VideoPlayerHandle {
 
 /**
  * Injected JavaScript that adds a supplementary message-event listener
- * so the library's setPlaybackRate / setVolume are forwarded to the
- * YouTube IFrame API player, AND injects a <style> tag to remove any
- * default body margins / iframe size constraints that would cause
- * letterboxing on the wrong axis (left/right dead space instead of
- * top/bottom).
+ * so the library's setPlaybackRate / setVolume / mute / unmute are forwarded
+ * to the YouTube IFrame API player.
+ *
+ * Two-pronged approach:
+ * 1. Direct handler — listens for message events and calls player.* immediately.
+ * 2. Fallback poll — if the direct handler can't reach window.player (timing),
+ *    a pending-volume variable is polled every 200ms and applied when the
+ *    player becomes available.
+ *
+ * Also injects a <style> tag to remove default body margins / iframe size
+ * constraints that would cause letterboxing on the wrong axis.
  */
 const INJECTED_JS = `
 (function(){
-  window.addEventListener('message',function(e){
-    try{
-      var d=JSON.parse(e.data);
-      if(d.eventName==='setPlaybackRate'&&window.player){
-        window.player.setPlaybackRate(d.meta.playbackRate);
-      }else if(d.eventName==='setVolume'&&window.player){
-        window.player.setVolume(d.meta.volume);
-      }else if(d.eventName==='muteVideo'&&window.player){
-        window.player.mute();
-      }else if(d.eventName==='unMuteVideo'&&window.player){
-        window.player.unMute();
+  var pendingVolume = undefined;
+  var pendingMuted = undefined; // true = mute, false = unmute
+
+  function applyToPlayer(fn) {
+    if (window.player && typeof window.player.setVolume === 'function') {
+      try { fn(window.player); } catch(_) {}
+      return true;
+    }
+    return false;
+  }
+
+  function handleMessageEvent(e) {
+    try {
+      // e.data may be a pre-parsed object on some WebView implementations
+      var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+      if (!d || !d.eventName) return;
+      switch (d.eventName) {
+        case 'setPlaybackRate':
+          applyToPlayer(function(p) { p.setPlaybackRate(d.meta.playbackRate); });
+          break;
+        case 'setVolume':
+          pendingVolume = d.meta.volume;
+          if (!applyToPlayer(function(p) { p.setVolume(d.meta.volume); })) {
+            // Player not ready yet — polling will pick it up
+          }
+          break;
+        case 'muteVideo':
+          pendingMuted = true;
+          applyToPlayer(function(p) { p.mute(); });
+          break;
+        case 'unMuteVideo':
+          pendingMuted = false;
+          applyToPlayer(function(p) { p.unMute(); });
+          break;
       }
-    }catch(_){}
-  });
+    } catch(_) {}
+  }
+
+  // Listen on both window (iOS) and document (Android) because React Native
+  // WebView dispatches postMessage events on different targets per platform.
+  window.addEventListener('message', handleMessageEvent);
+  document.addEventListener('message', handleMessageEvent);
+
+  // Fallback poll: apply any pending volume/mute change when the player
+  // becomes available (covers the gap between message arrival and onReady).
+  setInterval(function() {
+    if (!window.player || typeof window.player.setVolume !== 'function') return;
+    if (pendingVolume !== undefined) {
+      try { window.player.setVolume(pendingVolume); } catch(_) {}
+      pendingVolume = undefined;
+    }
+    if (pendingMuted === true) {
+      try { window.player.mute(); } catch(_) {}
+      pendingMuted = undefined;
+    } else if (pendingMuted === false) {
+      try { window.player.unMute(); } catch(_) {}
+      pendingMuted = undefined;
+    }
+  }, 200);
+
   (function enforceFill(){
     var s=document.createElement('style');
     s.textContent='html,body{margin:0!important;padding:0!important;background:#000!important;overflow:hidden!important;width:100%!important;height:100%!important}'+
@@ -180,7 +232,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           onChangeState={onChangeState}
           webViewProps={{
             allowsInlineMediaPlayback: true,
-            mediaPlaybackRequiresUserAction: true,
+            mediaPlaybackRequiresUserAction: false,
             injectedJavaScript: INJECTED_JS,
             style: { width: boxWidth, height: boxHeight, backgroundColor: "transparent" },
             userAgent:
