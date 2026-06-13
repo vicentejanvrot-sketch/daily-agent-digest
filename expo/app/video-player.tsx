@@ -364,6 +364,7 @@ export default function VideoPlayerScreen() {
                 useNativeDriver: true,
               }).start(() => {
                 setWatchedOverlayVisible(false);
+                router.back();
               });
             }, 3000);
           })
