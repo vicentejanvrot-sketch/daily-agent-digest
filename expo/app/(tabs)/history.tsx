@@ -13,14 +13,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import {
-  X,
   Ban,
-  XCircle,
-  History,
+  CheckCircle,
   ChevronDown,
   ChevronUp,
+  Clock,
+  History,
   AlertTriangle,
   Trash2,
+  X,
+  XCircle,
 } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
 import type { Run, RunStatus, Agent, Channel } from "@/lib/database";
@@ -247,7 +249,35 @@ export default function HistoryScreen() {
                     </Text>
                   </Pressable>
 
-                  <StatusPill status={item.status} />
+                  <StatusPill
+                    status={item.status}
+                    icon={
+                      item.status === "success" ? (
+                        <CheckCircle size={13} color={Colors.success} />
+                      ) : item.status === "partial" ? (
+                        <AlertTriangle size={13} color={Colors.warning} />
+                      ) : item.status === "failed" ? (
+                        <XCircle size={13} color={Colors.destructive} />
+                      ) : item.status === "running" ? (
+                        <Clock size={13} color={Colors.accent} />
+                      ) : item.status === "cancelled" ? (
+                        <Ban size={13} color={Colors.textMuted} />
+                      ) : null
+                    }
+                    label={
+                      item.status === "success"
+                        ? "Success"
+                        : item.status === "partial"
+                          ? "Partial"
+                          : item.status === "failed"
+                            ? "Failed"
+                            : item.status === "running"
+                              ? "Running"
+                              : item.status === "cancelled"
+                                ? "Cancelled"
+                                : undefined
+                    }
+                  />
                 </View>
 
                 {/* Date */}

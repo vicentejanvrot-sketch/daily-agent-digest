@@ -9,6 +9,11 @@ const CONFIG: Record<ChannelStatus, { label: string; color: string }> = {
   watch_later: { label: "Watch Later", color: Colors.warning },
 };
 
+/** Convert an HSL color string to HSLA with a given alpha. */
+function hsla(hsl: string, alpha: number): string {
+  return hsl.replace(/^hsl\(/, "hsla(").replace(/\)$/, `, ${alpha})`);
+}
+
 export const CHANNEL_STATUS_FILTERS = [
   { key: "all", label: "All Channels" },
   { key: "not_watched", label: "Not Watched" },
@@ -22,7 +27,7 @@ export type ChannelFilterKey = (typeof CHANNEL_STATUS_FILTERS)[number]["key"];
 export function ChannelStatusPill({ status }: { status: ChannelStatus | null }) {
   const cfg = (status && CONFIG[status]) ? CONFIG[status] : CONFIG.not_watched;
   return (
-    <View style={[styles.pill, { backgroundColor: `${cfg.color}22` }]}>
+    <View style={[styles.pill, { backgroundColor: hsla(cfg.color, 0.15), borderColor: cfg.color, borderWidth: 1 }]}>
       <View style={[styles.dot, { backgroundColor: cfg.color }]} />
       <Text style={[styles.label, { color: cfg.color }]}>{cfg.label}</Text>
     </View>
