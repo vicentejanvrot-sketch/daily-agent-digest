@@ -91,6 +91,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const currentTimeRef = useRef(0);
     /** Latest duration from YouTube infoDelivery events. */
     const durationRef = useRef(0);
+    /** Latest known player state — used by togglePlayback to decide play vs pause. */
+    const isPlayingRef = useRef(false);
     /** Interval ID for the progress-polling heartbeat. Cleared on unmount. */
     const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -126,6 +128,16 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
 
     const unMute = useCallback(async () => {
       sendCommand("unMute");
+    }, [sendCommand]);
+
+    const togglePlayback = useCallback(async () => {
+      // Use the internally tracked playing state (updated by infoDelivery
+      // events) so the toggle is always correct regardless of parent sync.
+      if (isPlayingRef.current) {
+        sendCommand("pauseVideo");
+      } else {
+        sendCommand("playVideo");
+      }
     }, [sendCommand]);
 
     // ── YouTube IFrame API listening handshake ────────────
@@ -219,7 +231,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       setVolume,
       mute,
       unMute,
-    }), [play, pause, seekTo, setVolume, mute, unMute]);
+      togglePlayback,
+    }), [play, pause, seekTo, setVolume, mute, unMute, togglePlayback]);
 
     // ── Cleanup poll interval on unmount ────────────────
     useEffect(() => {
@@ -274,10 +287,14 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             onProgress?.(currentTimeRef.current, durationRef.current);
           }
 
-          // Player state change
+          // Player state change — keep isPlayingRef in sync for togglePlayback
           if (typeof info.playerState === "number") {
-            const eventName = PLAYER_STATE_MAP[info.playerState as number];
+            const stateNum = info.playerState as number;
+            const eventName = PLAYER_STATE_MAP[stateNum];
             if (eventName) {
+              // Track playing state locally so togglePlayback is always correct
+              if (stateNum === 1) isPlayingRef.current = true;        // playing
+              else if (stateNum === 2 || stateNum === 0) isPlayingRef.current = false; // paused / ended
               onChangeState?.(eventName);
             }
           }

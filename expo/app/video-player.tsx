@@ -305,9 +305,11 @@ export default function VideoPlayerScreen() {
 
   const enterFullscreen = useCallback(async () => {
     setIsFullscreen(true);
-    if (Platform.OS === "web") {
-      await playerRef.current?.requestFullscreen();
-    }
+    // Don't use the browser Fullscreen API on web — it moves the
+    // iframe onto a native fullscreen layer that hides every React
+    // Native overlay (including the custom transport controls).
+    // The app already simulates fullscreen via absolute positioning
+    // and orientation lock, which keeps the controls tappable.
   }, []);
 
   const exitFullscreen = useCallback(async () => {
@@ -317,24 +319,6 @@ export default function VideoPlayerScreen() {
         await ScreenOrientation.unlockAsync();
       } catch {
         // ignore — orientation lock may not be active
-      }
-    } else {
-      try {
-        await playerRef.current?.exitFullscreen();
-      } catch {
-        // ignore
-      }
-      if (typeof document !== "undefined" && document.fullscreenElement) {
-        try {
-          if (document.exitFullscreen) {
-            await document.exitFullscreen();
-          } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (document as any).webkitExitFullscreen?.();
-          }
-        } catch {
-          // ignore
-        }
       }
     }
   }, []);
@@ -547,12 +531,10 @@ export default function VideoPlayerScreen() {
   const togglePlayPause = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     resetControlsTimer();
-    if (isPlaying) {
-      await playerRef.current?.pause();
-    } else {
-      await playerRef.current?.play();
-    }
-  }, [isPlaying, resetControlsTimer]);
+    // Use togglePlayback so the command always takes effect, even when
+    // isPlaying (parent state) is out of sync with the native player.
+    await playerRef.current?.togglePlayback();
+  }, [resetControlsTimer]);
 
   const skipBack = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -830,10 +812,11 @@ export default function VideoPlayerScreen() {
     );
   }
 
-  // Block the YouTube iframe from intercepting taps while embedded
-  // (on native the touch system layers correctly; on web iframes steal
-  // pointer events regardless of z-index).
-  const shouldBlockIframe = Platform.OS === "web" && !isFullscreen;
+  // Block the YouTube iframe / WebView from intercepting taps while
+  // embedded so the custom transport controls reliably receive touches.
+  // On web the iframe steals pointer events regardless of z-index;
+  // on native the WKWebView/WebView renders above all RN views.
+  const shouldBlockIframe = !isFullscreen;
 
   // ── Normal: player with transport overlay ───────────────────────
 
@@ -1024,200 +1007,186 @@ export default function VideoPlayerScreen() {
 
           </View>
         ) : (
-          <View>
-            <VideoPlayerContent
-              ref={playerRef}
-              videoId={videoIdStr}
-              width={embeddedWidth}
-              height={embeddedHeight}
-              playbackRate={playbackRate}
-              blockIframeTouches={shouldBlockIframe}
-              onReady={() => {
-                setReady(true);
-                if (errorTimerRef.current) {
-                  clearTimeout(errorTimerRef.current);
-                  errorTimerRef.current = null;
-                }
-                setLoadError(false);
-                const rate = Number(speed);
-                if (rate !== 1 && playerRef.current) {
-                  playerRef.current.inject(
-                    `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
-                  );
-                }
-              }}
-              onError={() => {
-                if (errorTimerRef.current) {
-                  clearTimeout(errorTimerRef.current);
-                }
-                errorTimerRef.current = setTimeout(() => {
-                  errorTimerRef.current = null;
-                  setLoadError(true);
-                }, 4000);
-              }}
-              onChangeState={handleStateChange}
-              onProgress={handleProgress}
-            />
-
-            {/* Transport overlay (embedded) */}
-            {ready && (
-              <Animated.View style={[styles.transportOverlay, { opacity: controlsOpacity }]} pointerEvents="box-none">
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.7)"]}
-                  style={styles.transportGradient}
-                  pointerEvents="none"
-                />
-                {/* Close button */}
-                <Pressable
-                  onPress={handleClose}
-                  style={styles.embeddedCloseBtn}
-                  hitSlop={12}
-                >
-                  <X size={22} color={Colors.white} />
-                </Pressable>
-
-                {/* Progress / scrubber row (embedded) */}
-                <View style={styles.embeddedProgressRow}>
-                  <Text style={styles.progressTimeText}>
-                    {formatTime(isSeeking ? seekFraction * duration : currentTime)}
-                  </Text>
-                  <View
-                    style={styles.progressBar}
-                    onLayout={(e) => {
-                      progressBarWidth.current = e.nativeEvent.layout.width;
-                    }}
-                    {...panResponder.panHandlers}
-                  >
-                    <View style={styles.progressBarTrack}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          { width: `${Math.min(100, progressFraction * 100)}%` },
-                        ]}
-                      />
-                      <View
-                        style={[
-                          styles.progressBarHandle,
-                          {
-                            left: `${Math.min(100, progressFraction * 100)}%`,
-                            opacity: isSeeking ? 1 : 0.6,
-                            transform: [
-                              { translateX: -6 },
-                              { scale: isSeeking ? 1.3 : 1 },
-                            ],
-                          },
-                        ]}
-                      />
-                    </View>
-                  </View>
-                  <Text style={styles.progressTimeText}>
-                    {formatTime(duration)}
-                  </Text>
-                  <Pressable
-                    onPress={toggleFullscreen}
-                    style={({ pressed }) => [
-                      styles.fullscreenToggleBtn,
-                      pressed && styles.fullscreenToggleBtnPressed,
-                    ]}
-                    hitSlop={8}
-                  >
-                    <Maximize size={18} color={Colors.textSecondary} />
-                  </Pressable>
-                </View>
-
-                <View style={styles.transportRow}>
-                  <Pressable
-                    onPress={skipBack}
-                    style={({ pressed }) => [
-                      styles.transportBtn,
-                      pressed && styles.transportBtnPressed,
-                    ]}
-                    hitSlop={8}
-                  >
-                    <Rewind size={26} color={Colors.white} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={togglePlayPause}
-                    style={({ pressed }) => [
-                      styles.transportBtn,
-                      styles.transportBtnPlay,
-                      pressed && styles.transportBtnPressed,
-                    ]}
-                    hitSlop={8}
-                  >
-                    {isPlaying ? (
-                      <Pause size={28} color={Colors.white} />
-                    ) : (
-                      <Play size={28} color={Colors.white} />
-                    )}
-                  </Pressable>
-
-                  <Pressable
-                    onPress={skipForward}
-                    style={({ pressed }) => [
-                      styles.transportBtn,
-                      pressed && styles.transportBtnPressed,
-                    ]}
-                    hitSlop={8}
-                  >
-                    <FastForward size={26} color={Colors.white} />
-                  </Pressable>
-                </View>
-
-                {/* Volume control (embedded) */}
-                <View style={styles.volumeRow}>
-                  <Pressable
-                    onPress={handleToggleMute}
-                    style={({ pressed }) => [
-                      styles.volumeBtn,
-                      pressed && styles.volumeBtnPressed,
-                    ]}
-                    hitSlop={8}
-                  >
-                    {isMuted ? (
-                      <VolumeX size={18} color={Colors.white} />
-                    ) : (
-                      <Volume2 size={18} color={Colors.white} />
-                    )}
-                  </Pressable>
-                  {!isMuted && (
-                    <View
-                      style={styles.volumeSliderArea}
-                      onStartShouldSetResponder={() => true}
-                      onMoveShouldSetResponder={() => true}
-                      onResponderGrant={(evt) => {
-                        const x = evt.nativeEvent.locationX;
-                        handleVolumeChange((x / 80) * 100);
-                      }}
-                      onResponderMove={(evt) => {
-                        const x = evt.nativeEvent.locationX;
-                        handleVolumeChange((x / 80) * 100);
-                      }}
-                    >
-                      <View style={styles.volumeSliderTrack} pointerEvents="none">
-                        <View
-                          style={[
-                            styles.volumeSliderFill,
-                            { width: `${volume}%` },
-                          ]}
-                        />
-                        <View
-                          style={[
-                            styles.volumeSliderThumb,
-                            { left: `${volume}%` },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  )}
-                </View>
-              </Animated.View>
-            )}
-          </View>
+          <VideoPlayerContent
+            ref={playerRef}
+            videoId={videoIdStr}
+            width={embeddedWidth}
+            height={embeddedHeight}
+            playbackRate={playbackRate}
+            blockIframeTouches={shouldBlockIframe}
+            onReady={() => {
+              setReady(true);
+              if (errorTimerRef.current) {
+                clearTimeout(errorTimerRef.current);
+                errorTimerRef.current = null;
+              }
+              setLoadError(false);
+              const rate = Number(speed);
+              if (rate !== 1 && playerRef.current) {
+                playerRef.current.inject(
+                  `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
+                );
+              }
+            }}
+            onError={() => {
+              if (errorTimerRef.current) {
+                clearTimeout(errorTimerRef.current);
+              }
+              errorTimerRef.current = setTimeout(() => {
+                errorTimerRef.current = null;
+                setLoadError(true);
+              }, 4000);
+            }}
+            onChangeState={handleStateChange}
+            onProgress={handleProgress}
+          />
         )}
 
       </View>
+
+      {/* ── Embedded transport controls (below video, NOT overlaid) ──
+           Rendered outside the player wrapper so the native WebView / iframe
+           can't capture taps meant for the transport buttons. */}
+      {!isFullscreen && ready && (
+        <Animated.View style={[styles.embeddedControlsStrip, { opacity: controlsOpacity }]}>
+          {/* Progress / scrubber row (embedded) */}
+          <View style={styles.embeddedProgressRow}>
+            <Text style={styles.progressTimeText}>
+              {formatTime(isSeeking ? seekFraction * duration : currentTime)}
+            </Text>
+            <View
+              style={styles.progressBar}
+              onLayout={(e) => {
+                progressBarWidth.current = e.nativeEvent.layout.width;
+              }}
+              {...panResponder.panHandlers}
+            >
+              <View style={styles.progressBarTrack}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.min(100, progressFraction * 100)}%` },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.progressBarHandle,
+                    {
+                      left: `${Math.min(100, progressFraction * 100)}%`,
+                      opacity: isSeeking ? 1 : 0.6,
+                      transform: [
+                        { translateX: -6 },
+                        { scale: isSeeking ? 1.3 : 1 },
+                      ],
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+            <Text style={styles.progressTimeText}>
+              {formatTime(duration)}
+            </Text>
+            <Pressable
+              onPress={toggleFullscreen}
+              style={({ pressed }) => [
+                styles.fullscreenToggleBtn,
+                pressed && styles.fullscreenToggleBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              <Maximize size={18} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <View style={styles.transportRow}>
+            <Pressable
+              onPress={skipBack}
+              style={({ pressed }) => [
+                styles.transportBtn,
+                pressed && styles.transportBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              <Rewind size={26} color={Colors.white} />
+            </Pressable>
+
+            <Pressable
+              onPress={togglePlayPause}
+              style={({ pressed }) => [
+                styles.transportBtn,
+                styles.transportBtnPlay,
+                pressed && styles.transportBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              {isPlaying ? (
+                <Pause size={28} color={Colors.white} />
+              ) : (
+                <Play size={28} color={Colors.white} />
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={skipForward}
+              style={({ pressed }) => [
+                styles.transportBtn,
+                pressed && styles.transportBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              <FastForward size={26} color={Colors.white} />
+            </Pressable>
+          </View>
+
+          {/* Volume control (embedded) */}
+          <View style={styles.volumeRow}>
+            <Pressable
+              onPress={handleToggleMute}
+              style={({ pressed }) => [
+                styles.volumeBtn,
+                pressed && styles.volumeBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              {isMuted ? (
+                <VolumeX size={18} color={Colors.white} />
+              ) : (
+                <Volume2 size={18} color={Colors.white} />
+              )}
+            </Pressable>
+            {!isMuted && (
+              <View
+                style={styles.volumeSliderArea}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderGrant={(evt) => {
+                  const x = evt.nativeEvent.locationX;
+                  handleVolumeChange((x / 80) * 100);
+                }}
+                onResponderMove={(evt) => {
+                  const x = evt.nativeEvent.locationX;
+                  handleVolumeChange((x / 80) * 100);
+                }}
+              >
+                <View style={styles.volumeSliderTrack} pointerEvents="none">
+                  <View
+                    style={[
+                      styles.volumeSliderFill,
+                      { width: `${volume}%` },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.volumeSliderThumb,
+                      { left: `${volume}%` },
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      )}
 
       {/* ── Fullscreen bottom bar (progress + transport + volume + speed + countdown) ── */}
       {isFullscreen && ready && (
@@ -1716,23 +1685,18 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
-  // ── Transport overlay (over the video) ──────────────────────
-  transportOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "flex-end",
-    zIndex: 60,
-  },
-  transportGradient: {
-    ...StyleSheet.absoluteFillObject,
-    height: 120,
-    top: undefined,
+  // ── Embedded controls strip (below video, not overlaid) ────
+  embeddedControlsStrip: {
+    width: "100%",
+    backgroundColor: Colors.black,
+    paddingBottom: 12,
   },
   transportRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 24,
-    paddingBottom: 28,
+    paddingBottom: 12,
     paddingHorizontal: 24,
   },
   transportBtn: {
@@ -1864,18 +1828,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 8,
   },
-  embeddedCloseBtn: {
-    position: "absolute",
-    top: 8,
-    right: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 20,
-  },
+
 
   // ── Speed pills ─────────────────────────────────────────────
   speedPillsContainer: {

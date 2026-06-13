@@ -18,6 +18,8 @@ export interface VideoPlayerHandle {
   mute: () => Promise<void>;
   /** Unmute audio. */
   unMute: () => Promise<void>;
+  /** Toggle between play and pause regardless of tracked state. */
+  togglePlayback: () => Promise<void>;
 }
 
 interface VideoPlayerContentProps {

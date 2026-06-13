@@ -102,12 +102,20 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const boxWidth = width ?? 0;
     const boxHeight = Math.round(boxWidth * 9 / 16);
 
+    // Toggle-based play/pause so the prop always changes value.
+    // If we used absolute setShouldPlay(true/false), a second call
+    // with the same value would be a React no-op and YoutubeIframe
+    // wouldn't re-render with the command.
     const play = useCallback(async () => {
       setShouldPlay(true);
     }, []);
 
     const pause = useCallback(async () => {
       setShouldPlay(false);
+    }, []);
+
+    const togglePlayback = useCallback(async () => {
+      setShouldPlay((prev) => !prev);
     }, []);
 
     const seekTo = useCallback(async (seconds: number) => {
@@ -141,7 +149,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       unMute: async () => {
         setNativeMuted(false);
       },
-    }), [play, pause, seekTo]);
+      togglePlayback,
+    }), [play, pause, seekTo, togglePlayback]);
 
     return (
       <View
@@ -175,6 +184,10 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             allowsFullscreenVideo: true,
             domStorageEnabled: true,
             thirdPartyCookiesEnabled: true,
+            // Prevent the native WebView from capturing touches so
+            // the React Native transport overlay (rendered above) can
+            // receive tap events on iOS/Android.
+            pointerEvents: _blockIframeTouches ? ("none" as const) : ("auto" as const),
           }}
           initialPlayerParams={{
             controls: false,
