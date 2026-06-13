@@ -659,6 +659,7 @@ export default function VideoPlayerScreen() {
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.speedPillsContainer}
+      style={{ flexGrow: 0 }}
     >
       {SPEED_KEYS.map((s) => {
         const isActive = s === speed;
@@ -1636,12 +1637,14 @@ const styles = StyleSheet.create({
   embeddedControlsRow: {
     width: "100%",
     alignSelf: "center",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
     paddingVertical: 6,
   },
   speedPillsWrapper: {
+    flexShrink: 1,
     alignItems: "center",
   },
   countdownRow: {
