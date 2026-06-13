@@ -323,7 +323,6 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       width: "100%",
       height: "100%",
       border: "none",
-      ...(blockIframeTouches ? { pointerEvents: "none" as const } : {}),
     };
 
     return (

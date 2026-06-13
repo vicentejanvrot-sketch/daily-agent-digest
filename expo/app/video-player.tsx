@@ -970,7 +970,7 @@ export default function VideoPlayerScreen() {
             width={isFullscreen ? fullscreenWidth : embeddedWidth}
             height={isFullscreen ? fullscreenHeight : embeddedHeight}
             playbackRate={playbackRate}
-            blockIframeTouches={!isFullscreen}
+            blockIframeTouches={false}
             onReady={() => {
               setReady(true);
               if (errorTimerRef.current) {

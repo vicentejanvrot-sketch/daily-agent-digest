@@ -270,10 +270,11 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             allowsFullscreenVideo: true,
             domStorageEnabled: true,
             thirdPartyCookiesEnabled: true,
-            // Prevent the native WebView from capturing touches so
-            // the React Native transport overlay (rendered above) can
-            // receive tap events on iOS/Android.
-            pointerEvents: _blockIframeTouches ? ("none" as const) : ("auto" as const),
+            // Always allow the WebView to be interactive so YouTube's IFrame API
+            // receives user-gesture signals and accepts programmatic play / pause
+            // commands (mobile autoplay policy). Transport controls are rendered
+            // below the player wrapper now, so the WebView cannot capture their taps.
+            pointerEvents: "auto" as const,
           }}
           initialPlayerParams={{
             controls: false,
