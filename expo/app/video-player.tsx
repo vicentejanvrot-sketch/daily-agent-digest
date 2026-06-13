@@ -1074,6 +1074,56 @@ export default function VideoPlayerScreen() {
                 >
                   <X size={22} color={Colors.white} />
                 </Pressable>
+
+                {/* Progress / scrubber row (embedded) */}
+                <View style={styles.embeddedProgressRow}>
+                  <Text style={styles.progressTimeText}>
+                    {formatTime(isSeeking ? seekFraction * duration : currentTime)}
+                  </Text>
+                  <View
+                    style={styles.progressBar}
+                    onLayout={(e) => {
+                      progressBarWidth.current = e.nativeEvent.layout.width;
+                    }}
+                    {...panResponder.panHandlers}
+                  >
+                    <View style={styles.progressBarTrack}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          { width: `${Math.min(100, progressFraction * 100)}%` },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.progressBarHandle,
+                          {
+                            left: `${Math.min(100, progressFraction * 100)}%`,
+                            opacity: isSeeking ? 1 : 0.6,
+                            transform: [
+                              { translateX: -6 },
+                              { scale: isSeeking ? 1.3 : 1 },
+                            ],
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                  <Text style={styles.progressTimeText}>
+                    {formatTime(duration)}
+                  </Text>
+                  <Pressable
+                    onPress={toggleFullscreen}
+                    style={({ pressed }) => [
+                      styles.fullscreenToggleBtn,
+                      pressed && styles.fullscreenToggleBtnPressed,
+                    ]}
+                    hitSlop={8}
+                  >
+                    <Maximize size={18} color={Colors.textSecondary} />
+                  </Pressable>
+                </View>
+
                 <View style={styles.transportRow}>
                   <Pressable
                     onPress={skipBack}
@@ -1168,70 +1218,7 @@ export default function VideoPlayerScreen() {
 
       </View>
 
-      {/* ── Progress / scrubber row ──────────────────────────── */}
-      {ready && (
-        <Animated.View
-          style={[
-            styles.progressRow,
-            isFullscreen && styles.progressRowFullscreen,
-            isFullscreen && { bottom: insets.bottom + 120 },
-            { opacity: controlsOpacity },
-          ]}
-        >
-          <Text style={styles.progressTimeText}>
-            {formatTime(isSeeking ? seekFraction * duration : currentTime)}
-          </Text>
-
-          {/* Progress bar */}
-          <View
-            style={styles.progressBar}
-            onLayout={(e) => {
-              progressBarWidth.current = e.nativeEvent.layout.width;
-            }}
-            {...panResponder.panHandlers}
-          >
-            <View style={styles.progressBarTrack}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${Math.min(100, progressFraction * 100)}%` },
-                ]}
-              />
-              <View
-                style={[
-                  styles.progressBarHandle,
-                  {
-                    left: `${Math.min(100, progressFraction * 100)}%`,
-                    opacity: isSeeking ? 1 : 0.6,
-                    transform: [
-                      { translateX: -6 },
-                      { scale: isSeeking ? 1.3 : 1 },
-                    ],
-                  },
-                ]}
-              />
-            </View>
-          </View>
-
-          <Text style={styles.progressTimeText}>
-            {formatTime(duration)}
-          </Text>
-
-          {/* Fullscreen toggle */}
-          <Pressable
-            onPress={toggleFullscreen}
-            style={({ pressed }) => [
-              styles.fullscreenToggleBtn,
-              pressed && styles.fullscreenToggleBtnPressed,
-            ]}
-            hitSlop={8}
-          >
-            <Maximize size={18} color={Colors.textSecondary} />
-          </Pressable>
-        </Animated.View>
-      )}
-
-      {/* ── Fullscreen bottom bar (transport + speed + countdown) ── */}
+      {/* ── Fullscreen bottom bar (progress + transport + volume + speed + countdown) ── */}
       {isFullscreen && ready && (
         <Animated.View
           style={[
@@ -1246,6 +1233,45 @@ export default function VideoPlayerScreen() {
             style={styles.fullscreenBottomGradient}
             pointerEvents="none"
           />
+          {/* Progress / scrubber row (fullscreen) */}
+          <View style={styles.fullscreenProgressRow}>
+            <Text style={styles.progressTimeText}>
+              {formatTime(isSeeking ? seekFraction * duration : currentTime)}
+            </Text>
+            <View
+              style={styles.progressBar}
+              onLayout={(e) => {
+                progressBarWidth.current = e.nativeEvent.layout.width;
+              }}
+              {...panResponder.panHandlers}
+            >
+              <View style={styles.progressBarTrack}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.min(100, progressFraction * 100)}%` },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.progressBarHandle,
+                    {
+                      left: `${Math.min(100, progressFraction * 100)}%`,
+                      opacity: isSeeking ? 1 : 0.6,
+                      transform: [
+                        { translateX: -6 },
+                        { scale: isSeeking ? 1.3 : 1 },
+                      ],
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+            <Text style={styles.progressTimeText}>
+              {formatTime(duration)}
+            </Text>
+          </View>
+
           {/* Transport row */}
           <View style={styles.fullscreenTransportRow}>
             <Pressable
@@ -1793,6 +1819,26 @@ const styles = StyleSheet.create({
   },
   fullscreenToggleBtnPressed: {
     backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  // ── Progress rows inside transport / bottom bar ───────────
+  embeddedProgressRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+    marginBottom: 4,
+  },
+  fullscreenProgressRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 10,
+    marginBottom: 6,
   },
 
   // ── Embedded controls row ───────────────────────────────────
