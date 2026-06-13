@@ -44,6 +44,38 @@ function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+// ─── time helpers ───────────────────────────────────────────────────
+
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+const AMPM = ["AM", "PM"] as const;
+
+function parseRunTime(time: string): { hour: string; minute: string; ampm: string } {
+  const parts = time.split(":");
+  const h = parseInt(parts[0] ?? "7", 10);
+  const m = parseInt(parts[1] ?? "0", 10);
+  const hour24 = Number.isNaN(h) ? 7 : h;
+  const minute = Number.isNaN(m) ? 0 : m;
+  const ampm = hour24 >= 12 ? "PM" : "AM";
+  let hour12 = hour24 % 12;
+  if (hour12 === 0) hour12 = 12;
+  return {
+    hour: String(hour12).padStart(2, "0"),
+    minute: String(minute).padStart(2, "0"),
+    ampm,
+  };
+}
+
+function composeRunTime(hour: string, minute: string, ampm: string): string {
+  let h = parseInt(hour, 10);
+  if (Number.isNaN(h)) h = 7;
+  const m = parseInt(minute, 10);
+  const minuteVal = Number.isNaN(m) ? 0 : m;
+  if (ampm === "PM" && h !== 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${String(minuteVal).padStart(2, "0")}`;
+}
+
 // ─── main screen ────────────────────────────────────────────────────
 
 const IPAD_BREAKPOINT = 768;
@@ -95,6 +127,25 @@ export default function AgentFormScreen() {
   // dropdowns
   const [tzOpen, setTzOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+
+  // derived time parts for the three dropdowns
+  const { hour: runHour, minute: runMinute, ampm: runAmPm } = useMemo(
+    () => parseRunTime(runTime),
+    [runTime],
+  );
+
+  const handleTimePartChange = useCallback(
+    (part: "hour" | "minute" | "ampm", value: string) => {
+      if (part === "hour") {
+        setRunTime(composeRunTime(value, runMinute, runAmPm));
+      } else if (part === "minute") {
+        setRunTime(composeRunTime(runHour, value, runAmPm));
+      } else {
+        setRunTime(composeRunTime(runHour, runMinute, value));
+      }
+    },
+    [runHour, runMinute, runAmPm],
+  );
 
   // saved existing recipient ids for delete diff
   const existingRecipientMapRef = useRef<Map<string, string>>(new Map());
@@ -390,15 +441,24 @@ export default function AgentFormScreen() {
           <View style={styles.row}>
             <View style={styles.halfField}>
               <FormLabel>Run Time</FormLabel>
-              <TextInput
-                style={styles.input}
-                value={runTime}
-                onChangeText={setRunTime}
-                placeholder="07:00"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
-              />
+              <View style={styles.timeRow}>
+                <TimeSelect
+                  value={runHour}
+                  options={HOURS}
+                  onSelect={(v) => handleTimePartChange("hour", v)}
+                />
+                <Text style={styles.timeSep}>:</Text>
+                <TimeSelect
+                  value={runMinute}
+                  options={MINUTES}
+                  onSelect={(v) => handleTimePartChange("minute", v)}
+                />
+                <TimeSelect
+                  value={runAmPm}
+                  options={AMPM}
+                  onSelect={(v) => handleTimePartChange("ampm", v)}
+                />
+              </View>
             </View>
             <View style={styles.halfField}>
               <FormLabel>Lookback Hours</FormLabel>
@@ -979,6 +1039,117 @@ const dropdownStyles = StyleSheet.create({
   optionTextSelected: { color: Colors.accent, fontWeight: "600" as const },
 });
 
+// ─── Time Select ─────────────────────────────────────────────────────
+
+function TimeSelect({
+  value,
+  options,
+  onSelect,
+}: {
+  value: string;
+  options: readonly string[];
+  onSelect: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View style={timeSelectStyles.wrap}>
+      <Pressable
+        style={({ pressed }) => [
+          timeSelectStyles.trigger,
+          pressed && { opacity: 0.8 },
+        ]}
+        onPress={() => setOpen((v) => !v)}
+      >
+        <Text style={timeSelectStyles.triggerText}>{value}</Text>
+        {open ? (
+          <ChevronUp size={12} color={Colors.textSecondary} />
+        ) : (
+          <ChevronDown size={12} color={Colors.textSecondary} />
+        )}
+      </Pressable>
+      {open ? (
+        <View style={timeSelectStyles.menu}>
+          <ScrollView
+            style={timeSelectStyles.menuScroll}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+          >
+            {options.map((opt) => {
+              const selected = opt === value;
+              return (
+                <Pressable
+                  key={opt}
+                  style={({ pressed }) => [
+                    timeSelectStyles.option,
+                    selected && timeSelectStyles.optionSelected,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  onPress={() => {
+                    onSelect(opt);
+                    setOpen(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      timeSelectStyles.optionText,
+                      selected && timeSelectStyles.optionTextSelected,
+                    ]}
+                  >
+                    {opt}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const timeSelectStyles = StyleSheet.create({
+  wrap: { position: "relative", flex: 1 },
+  trigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.input,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 2,
+  },
+  triggerText: { fontSize: 13, color: Colors.textPrimary, fontWeight: "500" as const },
+  menu: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    backgroundColor: Colors.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    maxHeight: 180,
+    overflow: "hidden",
+    zIndex: 100,
+  },
+  menuScroll: { maxHeight: 178 },
+  option: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    alignItems: "center" as const,
+  },
+  optionSelected: { backgroundColor: `${Colors.accent}15` },
+  optionText: { fontSize: 13, color: Colors.textSecondary },
+  optionTextSelected: { color: Colors.accent, fontWeight: "600" as const },
+});
+
 // ─── Chip ────────────────────────────────────────────────────────────
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
@@ -1048,6 +1219,8 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", gap: 10 },
   halfField: { flex: 1 },
+  timeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  timeSep: { fontSize: 14, color: Colors.textSecondary, fontWeight: "600" as const, marginHorizontal: 2 },
   flex1: { flex: 1 },
   chipInputRow: {
     flexDirection: "row",
