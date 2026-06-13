@@ -63,6 +63,8 @@ interface VideoPlayerContentProps {
   onError?: () => void;
   /** Fires when the YouTube player state changes (playing, paused, ended, etc.). */
   onChangeState?: (event: string) => void;
+  /** Ignored on native — only meaningful on web to block iframe tap interception. */
+  blockIframeTouches?: boolean;
 }
 
 /**
@@ -77,7 +79,7 @@ interface VideoPlayerContentProps {
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
-    { videoId, width, height: _height, playbackRate = 1, onReady, onError, onChangeState },
+    { videoId, width, height: _height, playbackRate = 1, onReady, onError, onChangeState, blockIframeTouches: _blockIframeTouches },
     ref,
   ) {
     const youtubeRef = useRef<YoutubeIframeRef | null>(null);

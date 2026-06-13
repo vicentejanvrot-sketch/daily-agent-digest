@@ -771,6 +771,11 @@ export default function VideoPlayerScreen() {
     );
   }
 
+  // Block the YouTube iframe from intercepting taps while embedded
+  // (on native the touch system layers correctly; on web iframes steal
+  // pointer events regardless of z-index).
+  const shouldBlockIframe = Platform.OS === "web" && !isFullscreen;
+
   // ── Normal: player with transport overlay ───────────────────────
 
   return (
@@ -929,6 +934,7 @@ export default function VideoPlayerScreen() {
               width={fullscreenWidth}
               height={fullscreenHeight}
               playbackRate={playbackRate}
+              blockIframeTouches={false}
               onReady={() => {
                 setReady(true);
                 if (errorTimerRef.current) {
@@ -965,6 +971,7 @@ export default function VideoPlayerScreen() {
               width={embeddedWidth}
               height={embeddedHeight}
               playbackRate={playbackRate}
+              blockIframeTouches={shouldBlockIframe}
               onReady={() => {
                 setReady(true);
                 if (errorTimerRef.current) {

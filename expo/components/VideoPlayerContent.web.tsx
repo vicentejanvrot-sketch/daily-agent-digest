@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useEffect, useRef, useCallback } from "react";
-import { View, StyleSheet, Platform } from "react-native";
+import { View, StyleSheet, Platform, type ViewStyle } from "react-native";
 
 // ── Public ref API (mirrors the native variant) ────────────────────
 
@@ -30,6 +30,8 @@ interface VideoPlayerContentProps {
   onError?: () => void;
   /** Fires when the YouTube player state changes (playing, paused, ended, etc.). */
   onChangeState?: (event: string) => void;
+  /** When true, the iframe gets pointer-events: none so taps reach overlay controls. */
+  blockIframeTouches?: boolean;
 }
 
 /** Maps YouTube IFrame API numeric player states to string events. */
@@ -67,22 +69,36 @@ function postToPlayer(iframe: HTMLIFrameElement | null, command: string, args?: 
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
-    { videoId, width: _width, height = 220, playbackRate: _playbackRate, onReady, onError, onChangeState },
+    { videoId, width: _width, height = 220, playbackRate: _playbackRate, onReady, onError, onChangeState, blockIframeTouches },
     ref,
   ) {
     const iframeElRef = useRef<HTMLIFrameElement | null>(null);
+    /** YouTube IFrame API has signalled onReady — player can accept commands. */
+    const playerReadyRef = useRef(false);
+    /** Commands queued before the player signalled ready. Flushed when onReady fires. */
+    const pendingCommandsRef = useRef<Array<() => void>>([]);
+
+    /** Post a command now if the player is ready, otherwise queue it. */
+    const sendCommand = useCallback((command: string, args?: unknown) => {
+      const action = () => postToPlayer(iframeElRef.current, command, args);
+      if (playerReadyRef.current) {
+        action();
+      } else {
+        pendingCommandsRef.current.push(action);
+      }
+    }, []);
 
     const play = useCallback(async () => {
-      postToPlayer(iframeElRef.current, "playVideo");
-    }, []);
+      sendCommand("playVideo");
+    }, [sendCommand]);
 
     const pause = useCallback(async () => {
-      postToPlayer(iframeElRef.current, "pauseVideo");
-    }, []);
+      sendCommand("pauseVideo");
+    }, [sendCommand]);
 
     const seekTo = useCallback(async (seconds: number) => {
-      postToPlayer(iframeElRef.current, "seekTo", seconds);
-    }, []);
+      sendCommand("seekTo", seconds);
+    }, [sendCommand]);
 
     // ── Forwarded ref API ─────────────────────────────────
     useImperativeHandle(ref, () => ({
@@ -145,6 +161,18 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
         } catch {
           return;
         }
+
+        // YouTube player ready — flush any queued commands
+        if (data.event === "onReady") {
+          playerReadyRef.current = true;
+          const queue = pendingCommandsRef.current;
+          pendingCommandsRef.current = [];
+          for (const cmd of queue) {
+            cmd();
+          }
+          return;
+        }
+
         // Player state change: {"event":"infoDelivery","info":{"playerState":1,...}}
         if (
           data.event === "infoDelivery" &&
@@ -163,9 +191,22 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       return () => window.removeEventListener("message", handleMessage);
     }, [onChangeState]);
 
-    const embedUrl =
-      `https://www.youtube.com/embed/${videoId}` +
-      `?playsinline=1&controls=0&modestbranding=1&rel=0&enablejsapi=1`;
+    const embedUrl = (() => {
+      let url =
+        `https://www.youtube.com/embed/${videoId}` +
+        `?playsinline=1&controls=0&modestbranding=1&rel=0&enablejsapi=1`;
+      if (typeof window !== "undefined" && window.location?.origin) {
+        url += `&origin=${encodeURIComponent(window.location.origin)}`;
+      }
+      return url;
+    })();
+
+    const iframeStyle: ViewStyle = {
+      width: "100%",
+      height: "100%",
+      border: "none",
+      ...(blockIframeTouches ? { pointerEvents: "none" as const } : {}),
+    };
 
     return (
       <View style={[styles.wrapper, { height }]}>
@@ -174,7 +215,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             iframeElRef.current = el;
           }}
           src={embedUrl}
-          style={{ width: "100%", height: "100%", border: "none" }}
+          style={iframeStyle}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
           allowFullScreen
           onLoad={onReady}

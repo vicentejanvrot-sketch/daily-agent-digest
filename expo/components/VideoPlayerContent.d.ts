@@ -22,6 +22,8 @@ interface VideoPlayerContentProps {
   onReady?: () => void;
   onError?: () => void;
   onChangeState?: (event: string) => void;
+  /** When true on web, the YouTube iframe gets pointer-events: none so overlay controls receive taps. */
+  blockIframeTouches?: boolean;
 }
 
 declare const VideoPlayerContent: React.ForwardRefExoticComponent<
