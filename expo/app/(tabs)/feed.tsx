@@ -626,18 +626,24 @@ function FeedCard({
         {/* Stats row */}
         {analysis ? (
           <View style={styles.statsRow}>
-            <Stat
-              icon={<Eye size={12} color={Colors.textMuted} />}
-              value={compactNumber(analysis.views_at_analysis)}
-            />
-            <Stat
-              icon={<ThumbsUp size={12} color={Colors.textMuted} />}
-              value={compactNumber(analysis.likes_at_analysis)}
-            />
-            <Stat
-              icon={<MessageCircle size={12} color={Colors.textMuted} />}
-              value={compactNumber(analysis.comments_at_analysis)}
-            />
+            {analysis.views_at_analysis != null ? (
+              <Stat
+                icon={<Eye size={12} color={Colors.textMuted} />}
+                value={compactNumber(analysis.views_at_analysis)}
+              />
+            ) : null}
+            {analysis.likes_at_analysis != null ? (
+              <Stat
+                icon={<ThumbsUp size={12} color={Colors.textMuted} />}
+                value={compactNumber(analysis.likes_at_analysis)}
+              />
+            ) : null}
+            {analysis.comments_at_analysis != null ? (
+              <Stat
+                icon={<MessageCircle size={12} color={Colors.textMuted} />}
+                value={compactNumber(analysis.comments_at_analysis)}
+              />
+            ) : null}
           </View>
         ) : null}
       </View>
