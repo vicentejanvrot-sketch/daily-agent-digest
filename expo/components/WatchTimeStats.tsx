@@ -45,7 +45,7 @@ const PERIOD_OPTIONS: { label: string; value: TimePeriod }[] = [
 
 export default function WatchTimeStats() {
   const [open, setOpen] = useState(false);
-  const [period, setPeriod] = useState<TimePeriod>("all");
+  const [period, setPeriod] = useState<TimePeriod>("7d");
   const [chartMode, setChartMode] = useState<ChartMode>("bar");
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
 
