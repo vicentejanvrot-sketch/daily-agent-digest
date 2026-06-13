@@ -991,7 +991,7 @@ function Dropdown({
                     {label}
                   </Text>
                   {selected ? (
-                    <Check size={16} color={Colors.accent} />
+                    <Check size={16} color={Colors.white} />
                   ) : null}
                 </Pressable>
               );
@@ -1036,9 +1036,9 @@ const dropdownStyles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
-  optionSelected: { backgroundColor: `${Colors.accent}15` },
+  optionSelected: { backgroundColor: Colors.accent },
   optionText: { fontSize: 14, color: Colors.textSecondary, flex: 1 },
-  optionTextSelected: { color: Colors.accent, fontWeight: "600" as const },
+  optionTextSelected: { color: Colors.white, fontWeight: "600" as const },
 });
 
 // ─── Time Select ─────────────────────────────────────────────────────
@@ -1182,9 +1182,9 @@ const timeSelectStyles = StyleSheet.create({
     borderBottomColor: Colors.border,
     alignItems: "center" as const,
   },
-  optionSelected: { backgroundColor: `${Colors.accent}15` },
+  optionSelected: { backgroundColor: Colors.accent },
   optionText: { fontSize: 13, color: Colors.textSecondary },
-  optionTextSelected: { color: Colors.accent, fontWeight: "600" as const },
+  optionTextSelected: { color: Colors.white, fontWeight: "600" as const },
 });
 
 const modalStyles = StyleSheet.create({
