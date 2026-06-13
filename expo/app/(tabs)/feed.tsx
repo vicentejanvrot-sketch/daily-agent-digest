@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -126,6 +126,14 @@ export default function FeedScreen() {
   const [search, setSearch] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>(params.agentId ?? "all");
   const [channelFilter, setChannelFilter] = useState<string>("all");
+
+  // Sync agentFilter when navigating here from Dashboard feed cards with an agentId param.
+  useEffect(() => {
+    if (params.agentId && params.agentId !== agentFilter) {
+      setAgentFilter(params.agentId);
+      setChannelFilter("all");
+    }
+  }, [params.agentId]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(
     (params.status as StatusFilter) || "not_watched",
   );
