@@ -1,6 +1,7 @@
 import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
 import React, { useRef, useImperativeHandle, forwardRef, useCallback, useState } from "react";
-import { View } from "react-native";
+import { View, Platform } from "react-native";
+import type WebView from "react-native-webview";
 
 // ── Public ref API ─────────────────────────────────────────────────
 
@@ -147,6 +148,11 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     ref,
   ) {
     const youtubeRef = useRef<YoutubeIframeRef | null>(null);
+    /** Direct ref to the underlying WebView so we can inject JavaScript
+     *  that calls the YouTube IFrame API player directly. This bypasses
+     *  the library's internal postMessage pipe, which is broken in v2.4.x
+     *  (see github.com/LonelyCpp/react-native-youtube-iframe/issues/376). */
+    const webViewRef = useRef<WebView | null>(null);
     const [shouldPlay, setShouldPlay] = useState(false);
     const [nativeVolume, setNativeVolume] = useState(100);
     const [nativeMuted, setNativeMuted] = useState(false);
@@ -156,6 +162,16 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
      *  stale relative to the real player. */
     const isPlayingRef = useRef(false);
 
+    /** Inject JavaScript that calls a method on the YouTube IFrame API player.
+     *  This is the direct fallback that bypasses the library's broken v2.4.x
+     *  postMessage pipeline. The `player` variable is set by YouTube's IFrame
+     *  API as a global on the iframe's window once the player is ready. */
+    const injectPlayerJS = useCallback((code: string) => {
+      if (webViewRef.current) {
+        webViewRef.current.injectJavaScript(code);
+      }
+    }, []);
+
     // Force the player into an exact 16:9 box derived from width only.
     // The incoming height prop is accepted for backward compat but NOT
     // used to size the player — this prevents the WebView from becoming
@@ -163,27 +179,30 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const boxWidth = width ?? 0;
     const boxHeight = Math.round(boxWidth * 9 / 16);
 
-    // Toggle-based play/pause so the prop always changes value.
-    // If we used absolute setShouldPlay(true/false), a second call
-    // with the same value would be a React no-op and YoutubeIframe
-    // wouldn't re-render with the command.
+    // Direct injectJavaScript calls that bypass the library's broken
+    // postMessage pipe in v2.4.x. The YouTube IFrame API player is stored
+    // as a global `player` variable by the library's iframe.html.
     const play = useCallback(async () => {
       setShouldPlay(true);
-    }, []);
+      injectPlayerJS('try{if(window.player&&player.playVideo){player.playVideo();}}catch(e){} true;');
+    }, [injectPlayerJS]);
 
     const pause = useCallback(async () => {
       setShouldPlay(false);
-    }, []);
+      injectPlayerJS('try{if(window.player&&player.pauseVideo){player.pauseVideo();}}catch(e){} true;');
+    }, [injectPlayerJS]);
 
     const togglePlayback = useCallback(async () => {
       // Use the actual playback state tracked from onChangeState events
       // rather than the shouldPlay React state, which can drift from reality.
       if (isPlayingRef.current) {
         setShouldPlay(false);
+        injectPlayerJS('try{if(window.player&&player.pauseVideo){player.pauseVideo();}}catch(e){} true;');
       } else {
         setShouldPlay(true);
+        injectPlayerJS('try{if(window.player&&player.playVideo){player.playVideo();}}catch(e){} true;');
       }
-    }, []);
+    }, [injectPlayerJS]);
 
     const seekTo = useCallback(async (seconds: number) => {
       youtubeRef.current?.seekTo(seconds, true);
@@ -209,15 +228,18 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       seekTo,
       setVolume: async (volume: number) => {
         setNativeVolume(volume);
+        injectPlayerJS(`try{if(window.player&&player.setVolume){player.setVolume(${volume});}}catch(e){} true;`);
       },
       mute: async () => {
         setNativeMuted(true);
+        injectPlayerJS('try{if(window.player&&player.mute){player.mute();}}catch(e){} true;');
       },
       unMute: async () => {
         setNativeMuted(false);
+        injectPlayerJS('try{if(window.player&&player.unMute){player.unMute();}}catch(e){} true;');
       },
       togglePlayback,
-    }), [play, pause, seekTo, togglePlayback]);
+    }), [play, pause, seekTo, togglePlayback, injectPlayerJS]);
 
     /** Intercept onChangeState to keep shouldPlay in sync with the real
      *  YouTube player. Without this, shouldPlay can drift (e.g. autoplay
@@ -275,6 +297,11 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             // commands (mobile autoplay policy). Transport controls are rendered
             // below the player wrapper now, so the WebView cannot capture their taps.
             pointerEvents: "auto" as const,
+            // Capture the underlying WebView ref so we can call injectJavaScript
+            // directly. The library's postMessage pipe is broken in v2.4.x.
+            ref: (ref: WebView | null) => {
+              webViewRef.current = ref;
+            },
           }}
           initialPlayerParams={{
             controls: false,
