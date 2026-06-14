@@ -16,6 +16,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { LinearGradient } from "expo-linear-gradient";
@@ -111,6 +112,68 @@ function formatTime(seconds: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
+// ── Resume-playback position persistence ────────────────────────────
+
+const POSITION_SAVE_INTERVAL_MS = 5000;
+const NEAR_END_THRESHOLD = 0.95;
+
+interface SavedPosition {
+  currentTime: number;
+  duration: number;
+  updatedAt: number;
+}
+
+function resumePositionKey(videoId: string): string {
+  return `@video_position/${videoId}`;
+}
+
+async function saveResumePosition(
+  videoId: string,
+  currentTime: number,
+  duration: number,
+): Promise<void> {
+  if (!videoId || duration <= 0) return;
+  const data: SavedPosition = {
+    currentTime,
+    duration,
+    updatedAt: Date.now(),
+  };
+  try {
+    await AsyncStorage.setItem(resumePositionKey(videoId), JSON.stringify(data));
+  } catch {
+    // Silently ignore write failures
+  }
+}
+
+async function loadResumePosition(
+  videoId: string,
+): Promise<SavedPosition | null> {
+  if (!videoId) return null;
+  try {
+    const raw = await AsyncStorage.getItem(resumePositionKey(videoId));
+    if (!raw) return null;
+    const data = JSON.parse(raw) as SavedPosition;
+    if (
+      typeof data.currentTime !== "number" ||
+      typeof data.duration !== "number"
+    ) {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+async function clearResumePosition(videoId: string): Promise<void> {
+  if (!videoId) return;
+  try {
+    await AsyncStorage.removeItem(resumePositionKey(videoId));
+  } catch {
+    // Silently ignore
+  }
+}
+
 // ── Screen ─────────────────────────────────────────────────────────
 
 export default function VideoPlayerScreen() {
@@ -149,6 +212,8 @@ export default function VideoPlayerScreen() {
     setIsFullscreen(false);
     setIsPlaying(false);
     autoWatchedRef.current = false;
+    lastSaveTimeRef.current = 0;
+    hasResumedRef.current = false;
     if (overlayTimerRef.current) {
       clearTimeout(overlayTimerRef.current);
       overlayTimerRef.current = null;
@@ -179,6 +244,16 @@ export default function VideoPlayerScreen() {
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  // ── Resume-playback refs ──────────────────────────────────────
+
+  const currentTimeRef = useRef(currentTime);
+  const lastSaveTimeRef = useRef(0);
+  const hasResumedRef = useRef(false);
 
   // ── Progress bar scrubbing state ─────────────────────────────
 
@@ -356,6 +431,15 @@ export default function VideoPlayerScreen() {
         setLoadError(false);
       } else if (event === "paused" || event === "ended") {
         setIsPlaying(false);
+        // Save position when paused so the user can resume later
+        if (event === "paused" && videoIdStr) {
+          saveResumePosition(videoIdStr, currentTimeRef.current, durationRef.current);
+        }
+      }
+      // Clear saved position when the video ends naturally, so reopening
+      // starts from the beginning rather than the last second.
+      if (event === "ended" && videoIdStr) {
+        clearResumePosition(videoIdStr);
       }
       // Auto-mark as watched when the video finishes naturally
       if (event === "ended" && itemIdStr && !autoWatchedRef.current) {
@@ -385,12 +469,16 @@ export default function VideoPlayerScreen() {
           });
       }
     },
-    [itemIdStr, updateStatus, watchedOverlayOpacity],
+    [itemIdStr, videoIdStr, updateStatus, watchedOverlayOpacity],
   );
 
   // Restore orientation / exit fullscreen on unmount
   useEffect(() => {
     return () => {
+      // Save playback position so the user can resume when they come back
+      if (videoIdStr) {
+        saveResumePosition(videoIdStr, currentTimeRef.current, durationRef.current);
+      }
       if (Platform.OS !== "web") {
         try {
           ScreenOrientation.unlockAsync();
@@ -407,7 +495,7 @@ export default function VideoPlayerScreen() {
         errorTimerRef.current = null;
       }
     };
-  }, []);
+  }, [videoIdStr]);
 
   // Sync isFullscreen when the user exits browser fullscreen (Escape key)
   useEffect(() => {
@@ -674,12 +762,27 @@ export default function VideoPlayerScreen() {
         const d = await playerRef.current?.getDuration();
         if (typeof t === "number") setCurrentTime(t);
         if (typeof d === "number") setDuration(d);
+        // Periodic position save — every 5 s while playing, so the user
+        // can resume from roughly where they left off.
+        if (
+          videoIdStr &&
+          isPlayingRef.current &&
+          typeof t === "number" &&
+          typeof d === "number" &&
+          d > 0
+        ) {
+          const now = Date.now();
+          if (now - lastSaveTimeRef.current >= POSITION_SAVE_INTERVAL_MS) {
+            lastSaveTimeRef.current = now;
+            saveResumePosition(videoIdStr, t, d);
+          }
+        }
       } catch {
         // ignore polling failures
       }
     }, 1000);
     return () => clearInterval(id);
-  }, [ready]);
+  }, [ready, videoIdStr]);
 
   // ── playbackRate as a number ───────────────────────────────────
 
@@ -971,13 +1074,30 @@ export default function VideoPlayerScreen() {
             height={isFullscreen ? fullscreenHeight : embeddedHeight}
             playbackRate={playbackRate}
             blockIframeTouches={false}
-            onReady={() => {
+            onReady={async () => {
               setReady(true);
               if (errorTimerRef.current) {
                 clearTimeout(errorTimerRef.current);
                 errorTimerRef.current = null;
               }
               setLoadError(false);
+              // Resume from saved position
+              if (!hasResumedRef.current && videoIdStr) {
+                hasResumedRef.current = true;
+                try {
+                  const saved = await loadResumePosition(videoIdStr);
+                  if (saved && saved.duration > 0) {
+                    if (saved.currentTime / saved.duration < NEAR_END_THRESHOLD) {
+                      playerRef.current?.seekTo(saved.currentTime);
+                    } else {
+                      // Near the end — clear so next open starts from beginning
+                      await clearResumePosition(videoIdStr);
+                    }
+                  }
+                } catch {
+                  // Ignore resume errors
+                }
+              }
               const rate = Number(speed);
               if (rate !== 1 && playerRef.current) {
                 playerRef.current.inject(
