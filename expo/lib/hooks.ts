@@ -165,6 +165,7 @@ export function useFeedItems(limit = 500) {
   return useQuery({
     queryKey: ["feedItems", limit],
     enabled: !!user,
+    staleTime: 30_000,
     queryFn: async (): Promise<ItemWithAnalysis[]> => {
       const { data, error } = await supabase
         .from("items")

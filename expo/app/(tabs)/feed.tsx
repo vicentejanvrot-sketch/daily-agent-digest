@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -237,6 +237,13 @@ export default function FeedScreen() {
     [],
   );
 
+  const renderFeedCard = useCallback(
+    ({ item }: { item: ItemWithAnalysis }) => (
+      <FeedCardMemo item={item} onOpen={openVideo} onStatus={setStatus} />
+    ),
+    [openVideo, setStatus],
+  );
+
   const handleAgentChange = useCallback(
     (value: string) => {
       setAgentFilter(value);
@@ -384,13 +391,8 @@ export default function FeedScreen() {
               </Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <FeedCard
-              item={item}
-              onOpen={openVideo}
-              onStatus={setStatus}
-            />
-          )}
+          removeClippedSubviews={true}
+          renderItem={renderFeedCard}
         />
       )}
     </View>
@@ -561,7 +563,7 @@ function fallbackAnalysis(item: ItemWithAnalysis) {
   };
 }
 
-function FeedCard({
+const FeedCard = React.memo(function FeedCard({
   item,
   onOpen,
   onStatus,
@@ -685,7 +687,33 @@ function FeedCard({
       </View>
     </Pressable>
   );
+}, feedCardComparator);
+
+/** Shallow-compare only the fields that can actually change per card.
+ *  React Query structuralSharing keeps the object identity stable when
+ *  the server data hasn't changed, but a custom comparator guarantees
+ *  that only meaningful updates trigger a re-render. */
+function feedCardComparator(
+  prev: { item: ItemWithAnalysis; onOpen: (item: ItemWithAnalysis) => void; onStatus: (id: string, status: ItemStatus) => void },
+  next: { item: ItemWithAnalysis; onOpen: (item: ItemWithAnalysis) => void; onStatus: (id: string, status: ItemStatus) => void },
+): boolean {
+  const pa = prev.item;
+  const na = next.item;
+  if (pa.id !== na.id) return false;
+  if (pa.user_status !== na.user_status) return false;
+  const paAnalysis = pa.item_analysis?.[0];
+  const naAnalysis = na.item_analysis?.[0];
+  if ((paAnalysis?.id ?? null) !== (naAnalysis?.id ?? null)) return false;
+  if ((paAnalysis?.views_at_analysis ?? null) !== (naAnalysis?.views_at_analysis ?? null)) return false;
+  if ((paAnalysis?.likes_at_analysis ?? null) !== (naAnalysis?.likes_at_analysis ?? null)) return false;
+  if ((paAnalysis?.comments_at_analysis ?? null) !== (naAnalysis?.comments_at_analysis ?? null)) return false;
+  if ((paAnalysis?.duration_seconds ?? null) !== (naAnalysis?.duration_seconds ?? null)) return false;
+  if (pa.title !== na.title) return false;
+  if (pa.thumbnail_url !== na.thumbnail_url) return false;
+  return true;
 }
+
+const FeedCardMemo = FeedCard;
 
 // ── Status Control (compact dropdown per card) ─────────────────────
 
